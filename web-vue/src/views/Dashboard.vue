@@ -72,7 +72,7 @@
             <i class="bi bi-graph-up"></i>
             Request Volume
           </h3>
-          <span class="text-muted" style="font-size: 12px;">Last 7 days</span>
+          <span class="text-muted" style="font-size: 12px;">{{ chartSubtitle }}</span>
         </div>
         <div class="card-body">
           <canvas ref="requestsChart" height="200"></canvas>
@@ -163,6 +163,15 @@ const stats = computed(() => statsStore)
 const toolStats = ref([])
 const recentSessions = ref([])
 
+const chartSubtitle = computed(() => {
+  if (timeFilter.value === 720) return 'Last 30 days'
+  if (timeFilter.value === 24) return 'Last 24 hours'
+  if (timeFilter.value === 5) return 'Last 5 hours'
+  if (timeFilter.value === 1) return 'Last 1 hour'
+  if (timeFilter.value === 0.5) return 'Last 30 minutes'
+  return 'Last 7 days'
+})
+
 function onTimeFilterChange() {
   statsStore.setTimeFilter(timeFilter.value)
   loadDashboardData()
@@ -206,7 +215,7 @@ async function loadDashboardData() {
 }
 
 function updateRequestsChart() {
-  if (!requestsChart.value || chartsStore.timelineData.length === 0) return
+  if (!requestsChart.value) return
 
   const labels = chartsStore.timelineData.map(d => {
     const date = new Date(d.date || d.timestamp)
@@ -215,40 +224,44 @@ function updateRequestsChart() {
   const data = chartsStore.timelineData.map(d => d.count || d.requests)
 
   if (requestsChartInstance) {
-    requestsChartInstance.destroy()
-  }
-
-  requestsChartInstance = new Chart(requestsChart.value, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Requests',
-        data,
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-        borderWidth: 2,
-        tension: 0.3,
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false }
+    // Update existing chart data
+    requestsChartInstance.data.labels = labels
+    requestsChartInstance.data.datasets[0].data = data
+    requestsChartInstance.update('none') // Update without animation
+  } else {
+    // Create new chart
+    requestsChartInstance = new Chart(requestsChart.value, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Requests',
+          data,
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+          borderWidth: 2,
+          tension: 0.3,
+          fill: true
+        }]
       },
-      scales: {
-        y: {
-          beginAtZero: true,
-          grid: { color: '#e2e8f0' }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
         },
-        x: {
-          grid: { display: false }
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: '#e2e8f0' }
+          },
+          x: {
+            grid: { display: false }
+          }
         }
       }
-    }
-  })
+    })
+  }
 }
 
 function updateModelsChart() {

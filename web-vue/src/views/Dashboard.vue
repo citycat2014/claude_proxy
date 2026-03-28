@@ -172,8 +172,17 @@ async function loadDashboardData() {
   // Load summary
   await statsStore.fetchSummary(timeFilter.value)
 
-  // Load timeline
-  await chartsStore.fetchTimeline(null, 7)
+  // Load timeline based on time filter
+  if (timeFilter.value === 720) {
+    // 30 days
+    await chartsStore.fetchTimeline(null, 30)
+  } else if (timeFilter.value) {
+    // Hours-based filter
+    await chartsStore.fetchTimeline(timeFilter.value, null)
+  } else {
+    // All Time - default to 7 days
+    await chartsStore.fetchTimeline(null, 7)
+  }
   updateRequestsChart()
 
   // Load model distribution

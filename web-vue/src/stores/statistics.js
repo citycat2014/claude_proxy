@@ -25,7 +25,7 @@ export const useStatisticsStore = defineStore('statistics', {
       this.loading = true
       this.error = null
       try {
-        const params = hours ? `?hours=${hours}` : ''
+        const params = hours !== null && hours !== undefined ? `?hours=${hours}` : ''
         const response = await fetch(`/api/statistics/summary${params}`)
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         this.summary = await response.json()

@@ -197,7 +197,7 @@ def serve_vue_assets(filename):
 @app.route("/api/statistics/summary")
 def api_statistics_summary():
     """Get summary statistics with optional time filter."""
-    hours = request.args.get("hours", None, type=int)
+    hours = request.args.get("hours", None, type=float)
     summary = stats_engine.get_summary(hours=hours)
     return jsonify({
         "total_requests": summary.total_requests,
@@ -223,7 +223,7 @@ def api_statistics_timeline():
 @app.route("/api/statistics/models")
 def api_statistics_models():
     """Get model distribution with optional time filter."""
-    hours = request.args.get("hours", None, type=int)
+    hours = request.args.get("hours", None, type=float)
     distribution = stats_engine.get_model_distribution(hours=hours)
     return jsonify(distribution)
 
@@ -231,7 +231,7 @@ def api_statistics_models():
 @app.route("/api/statistics/tools")
 def api_statistics_tools():
     """Get tool usage statistics with optional time filter."""
-    hours = request.args.get("hours", None, type=int)
+    hours = request.args.get("hours", None, type=float)
     stats = tool_analyzer.get_tool_usage_stats(hours=hours)
     return jsonify([
         {

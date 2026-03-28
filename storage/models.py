@@ -1,29 +1,47 @@
 """
-Data models for pkts_capture.
+SQLAlchemy ORM models for pkts_capture.
 
-Defines the schema and data structures for storing captured interactions.
+Defines database schema using SQLAlchemy declarative base.
 """
 
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 import json
 
+from sqlalchemy import (
+    create_engine, Column, Integer, String, Float, Boolean, DateTime,
+    ForeignKey, Index, Text
+)
+from sqlalchemy.orm import declarative_base, relationship, Session as DBSession
+from sqlalchemy.sql import func
 
-@dataclass
-class Session:
+from config.settings import DATABASE_PATH
+
+Base = declarative_base()
+
+
+class Session(Base):
     """A Claude Code session."""
-    id: Optional[int] = None
-    session_id: str = ""
-    started_at: Optional[datetime] = None
-    ended_at: Optional[datetime] = None
-    total_requests: int = 0
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
-    total_cost: float = 0.0
-    model: str = ""
-    user_agent: str = ""
-    working_directory: str = ""
+    __tablename__ = 'sessions'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(255), unique=True, nullable=False, index=True)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    ended_at = Column(DateTime, nullable=True)
+    total_requests = Column(Integer, default=0)
+    total_input_tokens = Column(Integer, default=0)
+    total_output_tokens = Column(Integer, default=0)
+    total_cost = Column(Float, default=0.0)
+    model = Column(String(100), nullable=True)
+    user_agent = Column(String(255), nullable=True)
+    working_directory = Column(String(500), nullable=True)
+
+    # Relationships
+    requests = relationship("Request", back_populates="session", lazy="dynamic")
+
+    __table_args__ = (
+        Index('idx_sessions_started', 'started_at'),
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -41,42 +59,53 @@ class Session:
         }
 
 
-@dataclass
-class Request:
+class Request(Base):
     """A single API request/response."""
-    id: Optional[int] = None
-    request_id: str = ""
-    session_id: str = ""
-    timestamp: Optional[datetime] = None
-    method: str = ""
-    endpoint: str = ""
+    __tablename__ = 'requests'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    request_id = Column(String(255), unique=True, nullable=False, index=True)
+    session_id = Column(String(255), ForeignKey('sessions.session_id'), nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    method = Column(String(20), nullable=True)
+    endpoint = Column(String(500), nullable=True)
 
     # Request info
-    model: str = ""
-    system_prompt: str = ""
-    messages_json: str = ""
+    model = Column(String(100), nullable=True)
+    system_prompt = Column(Text, nullable=True)
+    messages_json = Column(Text, nullable=True)
 
     # Response info
-    response_status: int = 0
-    response_time_ms: int = 0
-    is_streaming: bool = False
+    response_status = Column(Integer, nullable=True)
+    response_time_ms = Column(Integer, nullable=True)
+    is_streaming = Column(Boolean, default=False)
 
     # Token usage
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cache_creation_tokens: int = 0
-    cache_read_tokens: int = 0
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cache_creation_tokens = Column(Integer, default=0)
+    cache_read_tokens = Column(Integer, default=0)
 
     # Cost
-    cost: float = 0.0
+    cost = Column(Float, default=0.0)
 
     # Raw data
-    request_body: str = ""
-    response_body: str = ""
+    request_body = Column(Text, nullable=True)
+    response_body = Column(Text, nullable=True)
 
     # Parsed response content
-    response_text: str = ""  # 整合后的文本响应
-    response_thinking: str = ""  # 整合后的思考过程
+    response_text = Column(Text, nullable=True)
+    response_thinking = Column(Text, nullable=True)
+
+    # Relationships
+    session = relationship("Session", back_populates="requests")
+    tool_calls = relationship("ToolCall", back_populates="request", lazy="dynamic")
+    messages = relationship("Message", back_populates="request", lazy="dynamic")
+
+    __table_args__ = (
+        Index('idx_requests_session', 'session_id'),
+        Index('idx_requests_timestamp', 'timestamp'),
+    )
 
     def get_messages(self) -> List[Dict[str, Any]]:
         """Parse messages from JSON."""
@@ -113,16 +142,25 @@ class Request:
         }
 
 
-@dataclass
-class ToolCall:
+class ToolCall(Base):
     """A tool use event."""
-    id: Optional[int] = None
-    request_id: str = ""
-    tool_name: str = ""
-    tool_input_json: str = ""
-    tool_result: str = ""
-    timestamp: Optional[datetime] = None
-    duration_ms: int = 0
+    __tablename__ = 'tool_calls'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    request_id = Column(String(255), ForeignKey('requests.request_id'), nullable=False)
+    tool_name = Column(String(100), nullable=False, index=True)
+    tool_input_json = Column(Text, nullable=True)
+    tool_result = Column(Text, nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    duration_ms = Column(Integer, nullable=True)
+
+    # Relationships
+    request = relationship("Request", back_populates="tool_calls")
+
+    __table_args__ = (
+        Index('idx_tool_calls_request', 'request_id'),
+        Index('idx_tool_calls_name', 'tool_name'),
+    )
 
     def get_input(self) -> Dict[str, Any]:
         """Parse tool input from JSON."""
@@ -139,21 +177,29 @@ class ToolCall:
             "request_id": self.request_id,
             "tool_name": self.tool_name,
             "tool_input": self.get_input(),
-            "tool_result": self.tool_result[:500] if self.tool_result else "",  # Truncate for display
+            "tool_result": self.tool_result[:500] if self.tool_result else "",
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "duration_ms": self.duration_ms,
         }
 
 
-@dataclass
-class Message:
+class Message(Base):
     """A message in a conversation."""
-    id: Optional[int] = None
-    request_id: str = ""
-    role: str = ""  # user/assistant
-    content_type: str = ""  # text/tool_use/tool_result
-    content_text: str = ""
-    sequence: int = 0
+    __tablename__ = 'messages'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    request_id = Column(String(255), ForeignKey('requests.request_id'), nullable=False)
+    role = Column(String(50), nullable=False)  # user/assistant
+    content_type = Column(String(50), nullable=True)  # text/tool_use/tool_result
+    content_text = Column(Text, nullable=True)
+    sequence = Column(Integer, default=0)
+
+    # Relationships
+    request = relationship("Request", back_populates="messages")
+
+    __table_args__ = (
+        Index('idx_messages_request', 'request_id'),
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -166,17 +212,18 @@ class Message:
         }
 
 
-@dataclass
-class Statistics:
+class Statistics(Base):
     """Statistics snapshot."""
-    id: Optional[int] = None
-    period_type: str = ""  # hour/day
-    period_start: Optional[datetime] = None
-    request_count: int = 0
-    total_input_tokens: int = 0
-    total_output_tokens: int = 0
-    total_cost: float = 0.0
-    avg_response_time_ms: float = 0.0
+    __tablename__ = 'statistics'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    period_type = Column(String(20), nullable=True)  # hour/day
+    period_start = Column(DateTime, nullable=True)
+    request_count = Column(Integer, default=0)
+    total_input_tokens = Column(Integer, default=0)
+    total_output_tokens = Column(Integer, default=0)
+    total_cost = Column(Float, default=0.0)
+    avg_response_time_ms = Column(Float, nullable=True)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -189,3 +236,10 @@ class Statistics:
             "total_cost": self.total_cost,
             "avg_response_time_ms": self.avg_response_time_ms,
         }
+
+
+# Create engine
+engine = create_engine(f'sqlite:///{DATABASE_PATH}', echo=False)
+
+# Create all tables
+Base.metadata.create_all(engine)

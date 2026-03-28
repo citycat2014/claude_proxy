@@ -671,7 +671,7 @@ function renderSession(data) {
     document.getElementById('session-ended').textContent = session.ended_at ? formatDateTime(session.ended_at) : '-';
     document.getElementById('session-model').textContent = session.model || '-';
     document.getElementById('session-dir').textContent = session.working_directory || '-';
-    document.getElementById('session-requests').textContent = session.total_requests.toLocaleString();
+    document.getElementById('session-requests').textContent = (session.total_requests || 0).toLocaleString();
     document.getElementById('session-input').textContent = formatTokens(session.total_input_tokens);
     document.getElementById('session-output').textContent = formatTokens(session.total_output_tokens);
     document.getElementById('session-cost').textContent = formatCost(session.total_cost);

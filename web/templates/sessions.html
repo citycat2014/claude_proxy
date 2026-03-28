@@ -258,6 +258,7 @@ function renderSessions(sessions, totalPages) {
 }
 
 function formatDateTime(d) {
+    if (!d) return '-';
     const date = new Date(d);
     return date.toLocaleString('en-US', {
         month: 'short',
@@ -276,12 +277,14 @@ function formatModel(model) {
 }
 
 function formatTokens(n) {
+    if (n == null) return '0';
     if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
     if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
     return n.toLocaleString();
 }
 
 function formatCost(c) {
+    if (c == null) return '$0.0000';
     return '$' + (typeof c === 'number' ? c.toFixed(4) : parseFloat(c).toFixed(4));
 }
 </script>

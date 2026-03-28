@@ -5,7 +5,7 @@ Provides a web interface for viewing captured interactions,
 statistics, and analysis reports.
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask import Flask
 import os
 import sys
@@ -19,6 +19,10 @@ from storage.database import Database
 from analysis.token_analyzer import TokenAnalyzer
 from analysis.tool_analyzer import ToolAnalyzer
 from analysis.statistics import StatisticsEngine
+
+# Configuration
+USE_VUE = os.environ.get('USE_VUE', 'false').lower() == 'true'
+VUE_DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'vue-dist')
 
 
 def format_datetime(dt) -> str:
@@ -140,31 +144,50 @@ stats_engine = StatisticsEngine(db)
 @app.route("/")
 def index():
     """Dashboard page."""
+    if USE_VUE and os.path.exists(VUE_DIST_DIR):
+        return send_from_directory(VUE_DIST_DIR, 'index.html')
     return render_template("index.html")
 
 
 @app.route("/sessions")
 def sessions():
     """Sessions list page."""
+    if USE_VUE and os.path.exists(VUE_DIST_DIR):
+        return send_from_directory(VUE_DIST_DIR, 'index.html')
     return render_template("sessions.html")
 
 
 @app.route("/sessions/<session_id>")
 def session_detail(session_id):
     """Session detail page."""
+    if USE_VUE and os.path.exists(VUE_DIST_DIR):
+        return send_from_directory(VUE_DIST_DIR, 'index.html')
     return render_template("session_detail.html", session_id=session_id)
 
 
 @app.route("/requests/<request_id>")
 def request_detail(request_id):
     """Request detail page."""
+    if USE_VUE and os.path.exists(VUE_DIST_DIR):
+        return send_from_directory(VUE_DIST_DIR, 'index.html')
     return render_template("request_detail.html", request_id=request_id)
 
 
 @app.route("/analysis")
 def analysis():
     """Analysis page."""
+    if USE_VUE and os.path.exists(VUE_DIST_DIR):
+        return send_from_directory(VUE_DIST_DIR, 'index.html')
     return render_template("analysis.html")
+
+
+# Serve Vue static assets
+@app.route('/assets/<path:filename>')
+def serve_vue_assets(filename):
+    """Serve Vue assets."""
+    if USE_VUE and os.path.exists(VUE_DIST_DIR):
+        return send_from_directory(os.path.join(VUE_DIST_DIR, 'assets'), filename)
+    return jsonify({"error": "Not found"}), 404
 
 
 # ============================================================================

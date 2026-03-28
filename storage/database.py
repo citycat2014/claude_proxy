@@ -97,8 +97,8 @@ class Database:
             # Get total count
             total = query.count()
 
-            # Apply pagination and ordering
-            sessions = query.order_by(desc(Session.started_at)).offset(offset).limit(limit).all()
+            # Apply pagination and ordering - use ended_at if available, otherwise started_at
+            sessions = query.order_by(desc(func.coalesce(Session.ended_at, Session.started_at))).offset(offset).limit(limit).all()
 
             return sessions, total
         finally:

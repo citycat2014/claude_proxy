@@ -158,6 +158,7 @@ const toolsChart = ref(null)
 let requestsChartInstance = null
 let modelsChartInstance = null
 let toolsChartInstance = null
+let lastTimeFilter = null
 
 const stats = computed(() => statsStore)
 const toolStats = ref([])
@@ -217,18 +218,39 @@ async function loadDashboardData() {
 function updateRequestsChart() {
   if (!requestsChart.value) return
 
-  const labels = chartsStore.timelineData.map(d => {
-    const date = new Date(d.date || d.timestamp)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  })
-  const data = chartsStore.timelineData.map(d => d.count || d.requests)
+  const isMinuteLevel = timeFilter.value && timeFilter.value <= 1
+  const isHourLevel = timeFilter.value && timeFilter.value > 1 && timeFilter.value <= 24
+  const wasMinuteLevel = lastTimeFilter && lastTimeFilter <= 1
+  const wasHourLevel = lastTimeFilter && lastTimeFilter > 1 && lastTimeFilter <= 24
 
-  if (requestsChartInstance) {
+  // Check if granularity changed - need to recreate chart
+  const granularityChanged = (isMinuteLevel !== wasMinuteLevel) || (isHourLevel !== wasHourLevel)
+
+  const labels = chartsStore.timelineData.map(d => {
+    const date = new Date(d.date || d.timestamp || d.hour)
+    if (isMinuteLevel) {
+      // Minute granularity: show "HH:MM"
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    } else if (isHourLevel) {
+      // Hour granularity: show "HH:00"
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    } else {
+      // Day granularity: show "MMM DD"
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }
+  })
+  const data = chartsStore.timelineData.map(d => d.count || d.requests || 0)
+
+  if (requestsChartInstance && !granularityChanged) {
     // Update existing chart data
     requestsChartInstance.data.labels = labels
     requestsChartInstance.data.datasets[0].data = data
     requestsChartInstance.update('none') // Update without animation
   } else {
+    // Destroy old chart if exists
+    if (requestsChartInstance) {
+      requestsChartInstance.destroy()
+    }
     // Create new chart
     requestsChartInstance = new Chart(requestsChart.value, {
       type: 'line',
@@ -256,12 +278,18 @@ function updateRequestsChart() {
             grid: { color: '#e2e8f0' }
           },
           x: {
-            grid: { display: false }
+            grid: { display: false },
+            ticks: {
+              maxTicksLimit: isMinuteLevel ? 6 : (isHourLevel ? 8 : 7),
+              maxRotation: isMinuteLevel ? 45 : 0
+            }
           }
         }
       }
     })
   }
+
+  lastTimeFilter = timeFilter.value
 }
 
 function updateModelsChart() {

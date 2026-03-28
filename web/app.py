@@ -214,7 +214,7 @@ def api_statistics_summary():
 @app.route("/api/statistics/timeline")
 def api_statistics_timeline():
     """Get timeline statistics with optional time filter."""
-    hours = request.args.get("hours", None, type=int)
+    hours = request.args.get("hours", None, type=float)
     days = request.args.get("days", None, type=int)
     timeline = stats_engine.get_request_volume_timeline(hours=hours, days=days)
     return jsonify(timeline)

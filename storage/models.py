@@ -151,7 +151,7 @@ class ToolCall(Base):
     tool_name = Column(String(100), nullable=False, index=True)
     tool_input_json = Column(Text, nullable=True)
     tool_result = Column(Text, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.now)
     duration_ms = Column(Integer, nullable=True)
 
     # Relationships

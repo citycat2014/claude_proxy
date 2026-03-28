@@ -75,10 +75,21 @@ class Database:
         date_to: str = None,
         request_id_filter: str = None
     ) -> tuple[List[Session], int]:
-        """Get sessions list with filtering."""
+        """Get sessions list with filtering, ordered by most recent request time."""
         db = self.session_factory()
         try:
-            query = db.query(Session)
+            # Subquery to get latest request timestamp for each session
+            latest_request_subq = db.query(
+                Request.session_id,
+                func.max(Request.timestamp).label('latest_request_time')
+            ).group_by(Request.session_id).subquery()
+
+            # Main query with outer join to include sessions even without requests
+            query = db.query(Session, latest_request_subq.c.latest_request_time)
+            query = query.outerjoin(
+                latest_request_subq,
+                Session.session_id == latest_request_subq.c.session_id
+            )
 
             # Apply filters
             if session_id_filter:
@@ -94,11 +105,29 @@ class Database:
             if date_to:
                 query = query.filter(Session.started_at <= date_to)
 
-            # Get total count
-            total = query.count()
+            # Get total count (need to handle the join properly for count)
+            count_query = db.query(func.count(func.distinct(Session.id)))
+            if session_id_filter:
+                count_query = count_query.filter(Session.session_id.contains(session_id_filter))
+            if request_id_filter:
+                count_query = count_query.join(Request, Session.session_id == Request.session_id)
+                count_query = count_query.filter(Request.request_id.contains(request_id_filter))
+            if model_filter:
+                count_query = count_query.filter(Session.model == model_filter)
+            if date_from:
+                count_query = count_query.filter(Session.started_at >= date_from)
+            if date_to:
+                count_query = count_query.filter(Session.started_at <= date_to)
+            total = count_query.scalar()
 
-            # Apply pagination and ordering - use ended_at if available, otherwise started_at
-            sessions = query.order_by(desc(func.coalesce(Session.ended_at, Session.started_at))).offset(offset).limit(limit).all()
+            # Apply pagination and ordering - by latest request time, then by session end/start time
+            query = query.order_by(
+                desc(func.coalesce(latest_request_subq.c.latest_request_time, Session.ended_at, Session.started_at))
+            )
+            query = query.offset(offset).limit(limit)
+
+            results = query.all()
+            sessions = [r[0] for r in results]  # Extract Session objects from tuple
 
             return sessions, total
         finally:
@@ -185,6 +214,8 @@ class Database:
                 func.count(Request.id).label('total_requests'),
                 func.sum(Request.input_tokens).label('total_input_tokens'),
                 func.sum(Request.output_tokens).label('total_output_tokens'),
+                func.sum(Request.cache_creation_tokens).label('cache_creation_tokens'),
+                func.sum(Request.cache_read_tokens).label('cache_read_tokens'),
                 func.sum(Request.cost).label('total_cost'),
                 func.avg(Request.response_time_ms).label('avg_response_time_ms')
             )
@@ -207,6 +238,8 @@ class Database:
                 "total_sessions": session_count or 0,
                 "total_input_tokens": result.total_input_tokens or 0,
                 "total_output_tokens": result.total_output_tokens or 0,
+                "cache_creation_tokens": result.cache_creation_tokens or 0,
+                "cache_read_tokens": result.cache_read_tokens or 0,
                 "total_cost": result.total_cost or 0.0,
                 "avg_response_time_ms": result.avg_response_time_ms or 0.0,
             }
@@ -447,6 +480,7 @@ class Database:
                 for r in results
             ]
         finally:
+            db.close()
             db.close()
 
     def get_model_usage_stats_with_time_filter(self, hours: int = None) -> List[Dict[str, Any]]:

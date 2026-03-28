@@ -16,6 +16,8 @@ class SummaryStats:
     total_sessions: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
     total_cost: float = 0.0
     avg_response_time_ms: float = 0.0
     requests_today: int = 0
@@ -38,6 +40,8 @@ class StatisticsEngine:
             total_sessions=stats.get("total_sessions", 0),
             total_input_tokens=stats.get("total_input_tokens", 0),
             total_output_tokens=stats.get("total_output_tokens", 0),
+            cache_creation_tokens=stats.get("cache_creation_tokens", 0),
+            cache_read_tokens=stats.get("cache_read_tokens", 0),
             total_cost=stats.get("total_cost", 0),
             avg_response_time_ms=stats.get("avg_response_time_ms", 0),
             requests_today=today_stats.get("requests", 0),

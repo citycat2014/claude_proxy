@@ -124,3 +124,17 @@ mitmproxy generates certificates at `~/.mitmproxy/mitmproxy-ca-cert.pem`. The `i
 - Database schema is auto-initialized on first connection
 - Proxy addon uses flow metadata (`flow.metadata["is_tracked"]`) to track request/response pairs
 - Streaming responses use SSE (Server-Sent Events) format parsing
+
+## Important Lessons Learned
+
+### Timezone Consistency
+
+**Critical**: All timestamp fields must use consistent timezone handling. The project uses local time (not UTC) for all timestamps.
+
+- `Request.timestamp` - Uses `datetime.now()` (local time) set in `proxy/anthropic_handler.py`
+- `ToolCall.timestamp` - Must use `datetime.now()` (not `datetime.utcnow()`) in model default
+- `Session.started_at/ended_at` - Uses local time
+
+**Bug Example**: When ToolCall used `datetime.utcnow()` as default while Request used local time, time-based queries returned inconsistent results (e.g., "last 1 hour" showing requests but no tool calls because of 8-hour timezone difference).
+
+**Fix**: Ensure all `DateTime` columns in `storage/models.py` use `default=datetime.now` (without timezone conversion).

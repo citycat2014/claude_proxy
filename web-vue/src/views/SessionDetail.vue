@@ -23,10 +23,10 @@
             <dd><code>{{ store.currentSession.session_id }}</code></dd>
 
             <dt>Started</dt>
-            <dd>{{ formatDateTime(store.currentSession.started_at) }}</dd>
+            <dd>{{ formatDateTimeDetailed(store.currentSession.started_at) }}</dd>
 
             <dt>Ended</dt>
-            <dd>{{ store.currentSession.ended_at ? formatDateTime(store.currentSession.ended_at) : '-' }}</dd>
+            <dd>{{ store.currentSession.ended_at ? formatDateTimeDetailed(store.currentSession.ended_at) : '-' }}</dd>
 
             <dt>Model</dt>
             <dd>{{ formatModel(store.currentSession.model) }}</dd>
@@ -106,7 +106,7 @@
               </div>
               <span class="message-role-label">User</span>
               <span style="font-size: 12px; color: var(--text-muted);">
-                {{ formatDateTime(request.timestamp) }}
+                {{ formatDateTimeDetailed(request.timestamp) }}
               </span>
             </div>
             <div class="message-content-bubble user">
@@ -204,7 +204,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSessionsStore } from '@/stores/sessions'
-import { formatDateTime, formatModel, formatTokens, formatCost } from '@/utils/formatters'
+import { formatDateTime, formatDateTimeDetailed, formatModel, formatTokens, formatCost } from '@/utils/formatters'
 
 const route = useRoute()
 const store = useSessionsStore()

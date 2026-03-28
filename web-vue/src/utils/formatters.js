@@ -34,6 +34,19 @@ export function formatDateTime(d) {
   })
 }
 
+export function formatDateTimeDetailed(d) {
+  if (!d) return '-'
+  const date = new Date(d)
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  }) + '.' + date.getMilliseconds().toString().padStart(3, '0')
+}
+
 export function formatShortDate(d) {
   if (!d) return '-'
   const date = new Date(d)

@@ -49,7 +49,13 @@
           </div>
         </div>
         <div class="stat-value">{{ formatNumber(stats.totalTokens) }}</div>
-        <div class="stat-subtitle">Input: {{ formatNumber(stats.totalInputTokens) }} / Output: {{ formatNumber(stats.totalOutputTokens) }}</div>
+        <div class="stat-subtitle">
+          Input: {{ formatNumber(stats.totalInputTokens) }} / Output: {{ formatNumber(stats.totalOutputTokens) }}
+        </div>
+        <div class="stat-subtitle" style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+          <i class="bi bi-lightning-charge"></i> Cache Read: {{ formatNumber(stats.cacheReadTokens) }} |
+          <i class="bi bi-database"></i> Cache Write: {{ formatNumber(stats.cacheCreationTokens) }}
+        </div>
       </div>
 
       <div class="stat-card">
@@ -150,7 +156,7 @@ const statsStore = useStatisticsStore()
 const chartsStore = useChartsStore()
 const sessionsStore = useSessionsStore()
 
-const timeFilter = ref(1)
+const timeFilter = ref(statsStore.timeFilter)
 const requestsChart = ref(null)
 const modelsChart = ref(null)
 const toolsChart = ref(null)

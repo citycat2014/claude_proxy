@@ -204,6 +204,8 @@ def api_statistics_summary():
         "total_sessions": summary.total_sessions,
         "total_input_tokens": summary.total_input_tokens,
         "total_output_tokens": summary.total_output_tokens,
+        "cache_creation_tokens": summary.cache_creation_tokens,
+        "cache_read_tokens": summary.cache_read_tokens,
         "total_cost": summary.total_cost,
         "avg_response_time_ms": summary.avg_response_time_ms,
         "requests_today": summary.requests_today,

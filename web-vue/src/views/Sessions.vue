@@ -6,20 +6,21 @@
     </div>
 
     <!-- Filter Bar -->
-    <div class="filter-bar">
-      <div class="filter-row">
-        <div class="filter-group">
-          <label>Session ID</label>
+    <div class="filter-bar" style="margin-bottom: 20px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-color);">
+      <div class="filter-row" style="display: flex; gap: 16px; align-items: end; flex-wrap: wrap;">
+        <div class="filter-group" style="flex: 1; min-width: 200px;">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">Session ID</label>
           <input
             v-model="filters.sessionId"
             type="text"
             placeholder="Search session ID..."
             @keyup.enter="applyFilters"
+            style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary);"
           />
         </div>
         <div class="filter-group" style="flex: 1; min-width: 150px;">
-          <label>Model</label>
-          <select v-model="filters.model">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">Model</label>
+          <select v-model="filters.model" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary);">
             <option value="">All Models</option>
             <option value="claude">Claude</option>
             <option value="kimi">Kimi</option>
@@ -27,18 +28,18 @@
           </select>
         </div>
         <div class="filter-group" style="flex: 0.8; min-width: 140px;">
-          <label>From Date</label>
-          <input v-model="filters.dateFrom" type="date" />
+          <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">From Date</label>
+          <input v-model="filters.dateFrom" type="date" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary);" />
         </div>
         <div class="filter-group" style="flex: 0.8; min-width: 140px;">
-          <label>To Date</label>
-          <input v-model="filters.dateTo" type="date" />
+          <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">To Date</label>
+          <input v-model="filters.dateTo" type="date" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary);" />
         </div>
         <div class="filter-actions" style="display: flex; gap: 8px;">
-          <button @click="applyFilters" class="btn btn-primary">
+          <button @click="applyFilters" class="btn btn-primary" style="padding: 8px 16px;">
             <i class="bi bi-search"></i> Search
           </button>
-          <button @click="clearFilters" class="btn btn-outline">
+          <button @click="clearFilters" class="btn btn-outline" style="padding: 8px 16px;">
             <i class="bi bi-x-circle"></i> Clear
           </button>
         </div>

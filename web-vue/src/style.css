@@ -621,6 +621,32 @@ pre code {
   font-weight: 500;
 }
 
+/* Description List */
+.dl-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px 16px;
+}
+
+.dl-grid dt {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.dl-grid dd {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+/* Message Actions */
+.message-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
 /* Empty state */
 .empty-state {
   text-align: center;

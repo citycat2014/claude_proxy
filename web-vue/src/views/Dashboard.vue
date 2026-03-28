@@ -1,12 +1,12 @@
 <template>
   <div>
     <!-- Time Filter Bar -->
-    <div class="filter-bar" style="display: flex; align-items: center; gap: 16px; padding: 12px 16px;">
+    <div class="filter-bar" style="margin-bottom: 20px; padding: 12px 16px; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 16px;">
       <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Time Range:</span>
       <select
         v-model="timeFilter"
         @change="onTimeFilterChange"
-        style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 150px;"
+        style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 150px; cursor: pointer;"
       >
         <option :value="0.5">Last 30 Minutes</option>
         <option :value="1">Last 1 Hour</option>
@@ -92,7 +92,7 @@
       </div>
     </div>
 
-    <!-- Tool Usage Section -->
+    <!-- Bottom Row -->
     <div class="section-grid section-grid-2">
       <div class="card">
         <div class="card-header">
@@ -102,20 +102,7 @@
           </h3>
         </div>
         <div class="card-body">
-          <ul class="list-group" v-if="toolStats.length > 0">
-            <li v-for="tool in toolStats.slice(0, 5)" :key="tool.name" class="list-item">
-              <div class="list-item-content">
-                <div class="list-item-title">{{ tool.name }}</div>
-              </div>
-              <div class="list-item-meta">
-                <span class="badge badge-primary">{{ tool.calls }} calls</span>
-              </div>
-            </li>
-          </ul>
-          <div v-else class="empty-state">
-            <div class="empty-state-icon"><i class="bi bi-tools"></i></div>
-            <div class="empty-state-title">No tool usage yet</div>
-          </div>
+          <canvas ref="toolsChart" height="150"></canvas>
         </div>
       </div>
 
@@ -125,8 +112,9 @@
             <i class="bi bi-clock-history"></i>
             Recent Sessions
           </h3>
+          <router-link to="/sessions" class="btn btn-sm btn-outline">View All</router-link>
         </div>
-        <div class="card-body">
+        <div class="card-body" style="padding: 0;">
           <ul class="list-group" v-if="recentSessions.length > 0">
             <li v-for="session in recentSessions" :key="session.session_id" class="list-item">
               <div class="list-item-content">
@@ -165,9 +153,11 @@ const sessionsStore = useSessionsStore()
 const timeFilter = ref(1)
 const requestsChart = ref(null)
 const modelsChart = ref(null)
+const toolsChart = ref(null)
 
 let requestsChartInstance = null
 let modelsChartInstance = null
+let toolsChartInstance = null
 
 const stats = computed(() => statsStore)
 const toolStats = ref([])
@@ -195,6 +185,7 @@ async function loadDashboardData() {
     const response = await fetch(`/api/statistics/tools?hours=${timeFilter.value || ''}`)
     if (response.ok) {
       toolStats.value = await response.json()
+      updateToolsChart()
     }
   } catch (err) {
     console.error('Failed to load tool stats:', err)
@@ -287,10 +278,51 @@ function updateModelsChart() {
   })
 }
 
+function updateToolsChart() {
+  if (!toolsChart.value || toolStats.value.length === 0) return
+
+  const labels = toolStats.value.slice(0, 5).map(t => t.name)
+  const data = toolStats.value.slice(0, 5).map(t => t.calls)
+
+  if (toolsChartInstance) {
+    toolsChartInstance.destroy()
+  }
+
+  toolsChartInstance = new Chart(toolsChart.value, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Calls',
+        data,
+        backgroundColor: '#6366f1',
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: '#e2e8f0' }
+        },
+        x: {
+          grid: { display: false }
+        }
+      }
+    }
+  })
+}
+
 onMounted(() => {
   loadDashboardData()
 })
 
 watch(() => chartsStore.timelineData, updateRequestsChart)
 watch(() => chartsStore.modelDistribution, updateModelsChart)
+watch(() => toolStats.value, updateToolsChart)
 </script>

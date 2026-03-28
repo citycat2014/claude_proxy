@@ -7,49 +7,96 @@
       <span class="current">{{ store.currentSession.session_id.substring(0, 16) }}...</span>
     </div>
 
-    <!-- Session Info Card -->
-    <div class="card" style="margin-bottom: 24px;">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-info-circle"></i>
-          Session Information
-        </h3>
+    <!-- Session Overview - Two Column Layout -->
+    <div class="section-grid section-grid-2">
+      <!-- Session Information -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="bi bi-info-circle"></i>
+            Session Information
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="dl-grid">
+            <dt>Session ID</dt>
+            <dd><code>{{ store.currentSession.session_id }}</code></dd>
+
+            <dt>Started</dt>
+            <dd>{{ formatDateTime(store.currentSession.started_at) }}</dd>
+
+            <dt>Ended</dt>
+            <dd>{{ store.currentSession.ended_at ? formatDateTime(store.currentSession.ended_at) : '-' }}</dd>
+
+            <dt>Model</dt>
+            <dd>{{ formatModel(store.currentSession.model) }}</dd>
+
+            <dt>Working Directory</dt>
+            <dd>{{ store.currentSession.working_directory || '-' }}</dd>
+          </div>
+        </div>
       </div>
-      <div class="card-body">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
-          <div>
-            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Session ID</label>
-            <code>{{ store.currentSession.session_id }}</code>
-          </div>
-          <div>
-            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Started</label>
-            <span>{{ formatDateTime(store.currentSession.started_at) }}</span>
-          </div>
-          <div>
-            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Model</label>
-            <span class="badge badge-primary">{{ formatModel(store.currentSession.model) }}</span>
-          </div>
-          <div>
-            <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Working Directory</label>
-            <span>{{ store.currentSession.working_directory || '-' }}</span>
+
+      <!-- Statistics -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="bi bi-bar-chart"></i>
+            Statistics
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="dl-grid">
+            <dt>Total Requests</dt>
+            <dd>{{ store.currentSession.total_requests }}</dd>
+
+            <dt>Input Tokens</dt>
+            <dd>{{ formatTokens(store.currentSession.total_input_tokens) }}</dd>
+
+            <dt>Output Tokens</dt>
+            <dd>{{ formatTokens(store.currentSession.total_output_tokens) }}</dd>
+
+            <dt>Total Cost</dt>
+            <dd>{{ formatCost(store.currentSession.total_cost) }}</dd>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Requests Section -->
+    <!-- Timeline View -->
     <div class="card">
-      <div class="card-header">
-        <h3 class="card-title">
-          <i class="bi bi-chat-dots"></i>
-          Requests ({{ store.sessionPagination?.total || 0 }})
-        </h3>
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h3 class="card-title">
+            <i class="bi bi-clock-history"></i>
+            Conversation Timeline
+          </h3>
+          <span class="text-muted" style="font-size: 12px;">
+            {{ store.sessionPagination?.total || 0 }} total
+          </span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <label style="font-size: 12px; color: var(--text-secondary);">Filter by Model:</label>
+          <select
+            v-model="modelFilter"
+            style="padding: 6px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 150px;"
+          >
+            <option value="">All Models</option>
+            <option v-for="model in availableModels" :key="model" :value="model">{{ model }}</option>
+          </select>
+        </div>
       </div>
-      <div class="card-body">
-        <!-- Requests List -->
-        <div v-if="store.sessionRequests.length > 0">
+
+      <!-- Timeline Container -->
+      <div style="padding: 24px;">
+        <div v-if="store.loading" class="loading" style="text-align: center; padding: 48px;">
+          <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
+          <div>Loading conversation timeline...</div>
+        </div>
+
+        <div v-else-if="filteredRequests.length > 0">
           <div
-            v-for="request in store.sessionRequests"
+            v-for="request in filteredRequests"
             :key="request.request_id"
             class="message-bubble"
           >
@@ -105,47 +152,38 @@
         </div>
 
         <!-- Empty State -->
-        <div v-else-if="!store.loading" class="empty-state">
+        <div v-else class="empty-state">
           <div class="empty-state-icon"><i class="bi bi-inbox"></i></div>
           <div class="empty-state-title">No requests in this session</div>
         </div>
+      </div>
 
-        <!-- Loading -->
-        <div v-if="store.loading" class="loading">
-          <div class="loading-spinner"></div>
-          Loading requests...
+      <!-- Pagination -->
+      <div v-if="store.sessionPagination && store.sessionPagination.total_pages > 1" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border-top: 1px solid var(--border-color);">
+        <div style="font-size: 13px; color: var(--text-secondary);">
+          Showing {{ filteredRequests.length }} of {{ store.sessionPagination.total }} requests
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button
+            class="btn btn-sm btn-outline"
+            :disabled="store.sessionPagination.page <= 1"
+            @click="changePage(store.sessionPagination.page - 1)"
+          >
+            <i class="bi bi-chevron-left"></i> Previous
+          </button>
+          <span style="font-size: 13px; color: var(--text-secondary);">
+            Page {{ store.sessionPagination.page }} of {{ store.sessionPagination.total_pages }}
+          </span>
+          <button
+            class="btn btn-sm btn-outline"
+            :disabled="store.sessionPagination.page >= store.sessionPagination.total_pages"
+            @click="changePage(store.sessionPagination.page + 1)"
+          >
+            Next <i class="bi bi-chevron-right"></i>
+          </button>
         </div>
       </div>
     </div>
-
-    <!-- Pagination -->
-    <nav v-if="store.sessionPagination && store.sessionPagination.total_pages > 1" style="padding: 16px;">
-      <ul class="pagination">
-        <li
-          v-if="store.sessionPagination.page > 1"
-          class="page-item"
-          @click="changePage(store.sessionPagination.page - 1)"
-        >
-          <a href="#"><i class="bi bi-chevron-left"></i></a>
-        </li>
-        <li
-          v-for="pageNum in displayedPages"
-          :key="pageNum"
-          class="page-item"
-          :class="{ active: pageNum === store.sessionPagination.page }"
-          @click="changePage(pageNum)"
-        >
-          <a href="#">{{ pageNum }}</a>
-        </li>
-        <li
-          v-if="store.sessionPagination.page < store.sessionPagination.total_pages"
-          class="page-item"
-          @click="changePage(store.sessionPagination.page + 1)"
-        >
-          <a href="#"><i class="bi bi-chevron-right"></i></a>
-        </li>
-      </ul>
-    </nav>
   </div>
 
   <!-- Loading State -->
@@ -163,30 +201,25 @@
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSessionsStore } from '@/stores/sessions'
-import { formatDateTime, formatModel } from '@/utils/formatters'
+import { formatDateTime, formatModel, formatTokens, formatCost } from '@/utils/formatters'
 
 const route = useRoute()
 const store = useSessionsStore()
 
 const sessionId = route.params.id
+const modelFilter = ref('')
 
-const displayedPages = computed(() => {
-  if (!store.sessionPagination) return []
-  const pages = []
-  const total = store.sessionPagination.total_pages
-  const current = store.sessionPagination.page
+const availableModels = computed(() => {
+  const models = new Set(store.sessionRequests.map(r => r.model).filter(Boolean))
+  return Array.from(models).sort()
+})
 
-  for (let i = 1; i <= total; i++) {
-    if (i === 1 || i === total || (i >= current - 1 && i <= current + 1)) {
-      pages.push(i)
-    } else if (i === current - 2 || i === current + 2) {
-      pages.push('...')
-    }
-  }
-  return pages.filter((p, idx, arr) => p !== '...' || arr[idx - 1] !== '...')
+const filteredRequests = computed(() => {
+  if (!modelFilter.value) return store.sessionRequests
+  return store.sessionRequests.filter(r => r.model === modelFilter.value)
 })
 
 function extractUserInput(messagesJson) {

@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Time Filter Bar -->
+<div class="filter-bar" style="margin-bottom: 20px; padding: 12px 16px; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 16px;">
+    <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Time Range:</span>
+    <select id="time-filter-select" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 150px; cursor: pointer;">
+        <option value="0.5">Last 30 Minutes</option>
+        <option value="1" selected>Last 1 Hour</option>
+        <option value="5">Last 5 Hours</option>
+        <option value="24">Last 24 Hours</option>
+        <option value="720">Last 30 Days</option>
+        <option value="">All Time</option>
+    </select>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-label">Total Requests</span>
+            <div class="stat-icon primary">
+                <i class="bi bi-chat-dots"></i>
+            </div>
+        </div>
+        <div class="stat-value" id="total-requests">-</div>
+        <div class="stat-subtitle" id="requests-today">Today: -</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-label">Sessions</span>
+            <div class="stat-icon success">
+                <i class="bi bi-collection"></i>
+            </div>
+        </div>
+        <div class="stat-value" id="total-sessions">-</div>
+        <div class="stat-subtitle">Unique sessions</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-label">Total Tokens</span>
+            <div class="stat-icon info">
+                <i class="bi bi-cpu"></i>
+            </div>
+        </div>
+        <div class="stat-value" id="total-tokens">-</div>
+        <div class="stat-subtitle" id="token-breakdown">Input: - / Output: -</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-label">Total Cost</span>
+            <div class="stat-icon warning">
+                <i class="bi bi-currency-dollar"></i>
+            </div>
+        </div>
+        <div class="stat-value" id="total-cost">-</div>
+        <div class="stat-subtitle" id="cost-today">Today: -</div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="charts-grid">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="bi bi-graph-up"></i>
+                Request Volume
+            </h3>
+            <span class="text-muted" style="font-size: 12px;">Last 7 days</span>
+        </div>
+        <div class="card-body">
+            <canvas id="requests-chart" height="200"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="bi bi-pie-chart"></i>
+                Model Distribution
+            </h3>
+        </div>
+        <div class="card-body">
+            <canvas id="models-chart" height="200"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Row -->
+<div class="section-grid section-grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="bi bi-tools"></i>
+                Top Tools
+            </h3>
+        </div>
+        <div class="card-body">
+            <canvas id="tools-chart" height="150"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="bi bi-clock-history"></i>
+                Recent Sessions
+            </h3>
+            <a href="/sessions" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <div id="recent-sessions" class="list-group">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    Loading sessions...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Mock data for demonstration
+const mockData = {
+    summary: {
+        total_requests: 1247,
+        total_sessions: 56,
+        total_input_tokens: 2345678,
+        total_output_tokens: 890123,
+        total_cost: 12.4567,
+        requests_today: 23,
+        cost_today: 0.2345
+    },
+    timeline: [
+        { date: '2024-03-20', requests: 145 },
+        { date: '2024-03-21', requests: 189 },
+        { date: '2024-03-22', requests: 234 },
+        { date: '2024-03-23', requests: 178 },
+        { date: '2024-03-24', requests: 267 },
+        { date: '2024-03-25', requests: 198 },
+        { date: '2024-03-26', requests: 36 }
+    ],
+    models: {
+        'claude-3-opus': 456,
+        'claude-3-sonnet': 523,
+        'claude-3-haiku': 268
+    },
+    tools: [
+        { name: 'Read', calls: 345 },
+        { name: 'Write', calls: 234 },
+        { name: 'Bash', calls: 189 },
+        { name: 'Edit', calls: 156 },
+        { name: 'Glob', calls: 98 },
+        { name: 'Grep', calls: 87 },
+        { name: 'Task', calls: 76 },
+        { name: 'WebSearch', calls: 62 }
+    ],
+    sessions: [
+        { session_id: 'sess_abc123def456', started_at: '2024-03-26T10:30:00Z', total_requests: 23, total_cost: 0.3456 },
+        { session_id: 'sess_xyz789abc012', started_at: '2024-03-26T09:15:00Z', total_requests: 18, total_cost: 0.2345 },
+        { session_id: 'sess_def345ghi678', started_at: '2024-03-26T08:45:00Z', total_requests: 31, total_cost: 0.4567 },
+        { session_id: 'sess_jkl901mno234', started_at: '2024-03-25T16:20:00Z', total_requests: 15, total_cost: 0.1876 },
+        { session_id: 'sess_pqr567stu890', started_at: '2024-03-25T14:00:00Z', total_requests: 27, total_cost: 0.3987 }
+    ]
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize time filter
+    initTimeFilter();
+
+    // Load initial data (default: last 1 hour)
+    loadDashboardData(1);
+});
+
+// Current time filter hours
+let currentTimeFilter = 1;
+
+function initTimeFilter() {
+    const select = document.getElementById('time-filter-select');
+    select.addEventListener('change', function() {
+        const value = this.value;
+        const hours = value ? parseFloat(value) : null;
+        currentTimeFilter = hours;
+        loadDashboardData(hours);
+    });
+}
+
+function loadDashboardData(hours) {
+    loadSummary(hours);
+    loadTimeline(hours);
+    loadModelDistribution(hours);
+    loadToolUsage(hours);
+    loadRecentSessions(hours);
+}
+
+async function loadSummary(hours) {
+    try {
+        const url = hours ? `/api/statistics/summary?hours=${hours}` : '/api/statistics/summary';
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        renderSummary(data);
+    } catch (e) {
+        // Use mock data if API fails
+        renderSummary(mockData.summary);
+    }
+}
+
+function renderSummary(data) {
+    document.getElementById('total-requests').textContent = formatNumber(data.total_requests);
+    document.getElementById('total-sessions').textContent = formatNumber(data.total_sessions);
+    document.getElementById('total-tokens').textContent = formatTokens(data.total_input_tokens + data.total_output_tokens);
+    document.getElementById('total-cost').textContent = formatCost(data.total_cost);
+    document.getElementById('requests-today').textContent = 'Today: ' + formatNumber(data.requests_today);
+    document.getElementById('token-breakdown').textContent = 'Input: ' + formatTokens(data.total_input_tokens) + ' / Output: ' + formatTokens(data.total_output_tokens);
+    document.getElementById('cost-today').textContent = 'Today: ' + formatCost(data.cost_today);
+}
+
+async function loadTimeline(hours) {
+    try {
+        let url;
+        if (hours && hours <= 24) {
+            url = `/api/statistics/timeline?hours=${hours}`;
+        } else if (hours) {
+            url = `/api/statistics/timeline?days=${Math.ceil(hours / 24)}`;
+        } else {
+            url = '/api/statistics/timeline?days=7';
+        }
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        renderTimeline(data);
+    } catch (e) {
+        renderTimeline(mockData.timeline);
+    }
+}
+
+function renderTimeline(data) {
+    // Destroy existing chart if any
+    const existingChart = Chart.getChart('requests-chart');
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
+    const ctx = document.getElementById('requests-chart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => formatTimelineLabel(d.date || d.hour)),
+            datasets: [{
+                label: 'Requests',
+                data: data.map(d => d.requests),
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3,
+                pointBackgroundColor: '#6366f1',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#64748b', font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#e2e8f0', drawBorder: false },
+                    ticks: { color: '#64748b', font: { size: 11 } }
+                }
+            }
+        }
+    });
+}
+
+async function loadModelDistribution(hours) {
+    try {
+        const url = hours ? `/api/statistics/models?hours=${hours}` : '/api/statistics/models';
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        renderModelDistribution(data);
+    } catch (e) {
+        renderModelDistribution(mockData.models);
+    }
+}
+
+function renderModelDistribution(data) {
+    const labels = Object.keys(data);
+    const values = Object.values(data);
+    const colors = ['#6366f1', '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'];
+
+    const ctx = document.getElementById('models-chart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true,
+                        font: { size: 11 }
+                    }
+                }
+            }
+        }
+    });
+}
+
+async function loadToolUsage(hours) {
+    try {
+        const url = hours ? `/api/statistics/tools?hours=${hours}` : '/api/statistics/tools';
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        renderToolUsage(data.slice(0, 8));
+    } catch (e) {
+        renderToolUsage(mockData.tools);
+    }
+}
+
+function renderToolUsage(data) {
+    const ctx = document.getElementById('tools-chart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.map(t => t.name),
+            datasets: [{
+                label: 'Calls',
+                data: data.map(t => t.calls),
+                backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                borderRadius: 4,
+                barThickness: 20
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: { display: false },
+                    ticks: { color: '#64748b', font: { size: 11 } }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { color: '#64748b', font: { size: 12 } }
+                }
+            }
+        }
+    });
+}
+
+async function loadRecentSessions(hours) {
+    try {
+        let url = '/api/sessions?per_page=5';
+        if (hours) {
+            const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+            url += `&date_from=${since.split('T')[0]}`;
+        }
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        renderRecentSessions(data.sessions);
+    } catch (e) {
+        renderRecentSessions(mockData.sessions);
+    }
+}
+
+function renderRecentSessions(sessions) {
+    const container = document.getElementById('recent-sessions');
+
+    if (sessions.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon"><i class="bi bi-inbox"></i></div>
+                <div class="empty-state-title">No sessions yet</div>
+                <p>Captured sessions will appear here</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = sessions.map(s => `
+        <a href="/sessions/${s.session_id}" class="list-item">
+            <div class="list-item-content">
+                <div class="list-item-title">${s.session_id.substring(0, 20)}...</div>
+                <div class="list-item-subtitle">${s.total_requests} requests</div>
+            </div>
+            <div class="list-item-meta">
+                <div class="list-item-title">${formatCost(s.total_cost)}</div>
+                <div class="list-item-subtitle">${formatRelativeTime(s.started_at)}</div>
+            </div>
+        </a>
+    `).join('');
+}
+
+// Utility functions
+function formatNumber(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return n.toString();
+}
+
+function formatTokens(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return n.toString();
+}
+
+function formatCost(c) {
+    return '$' + (typeof c === 'number' ? c.toFixed(4) : parseFloat(c).toFixed(4));
+}
+
+function formatShortDate(d) {
+    const date = new Date(d);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatTimelineLabel(d) {
+    if (!d) return '';
+    // Check if it's an hour format (contains space and colon)
+    if (d.includes(' ') && d.includes(':')) {
+        // Extract hour from "2026-03-28 08:00" format
+        const parts = d.split(' ');
+        if (parts.length >= 2) {
+            return parts[1].substring(0, 5); // Return "08:00"
+        }
+    }
+    // Otherwise format as date
+    const date = new Date(d);
+    if (isNaN(date.getTime())) {
+        return d; // Return as-is if invalid
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatRelativeTime(d) {
+    const date = new Date(d);
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 60) return minutes + 'm ago';
+    if (hours < 24) return hours + 'h ago';
+    return days + 'd ago';
+}
+</script>
+{% endblock %}

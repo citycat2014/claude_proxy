@@ -251,6 +251,7 @@ def api_sessions():
 
     # Get filter parameters
     session_id = request.args.get("session_id", None)
+    request_id = request.args.get("request_id", None)
     model = request.args.get("model", None)
     date_from = request.args.get("date_from", None)
     date_to = request.args.get("date_to", None)
@@ -258,6 +259,7 @@ def api_sessions():
     sessions, total = db.get_sessions(
         limit=per_page, offset=(page - 1) * per_page,
         session_id_filter=session_id,
+        request_id_filter=request_id,
         model_filter=model,
         date_from=date_from,
         date_to=date_to

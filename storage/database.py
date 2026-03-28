@@ -72,7 +72,8 @@ class Database:
         session_id_filter: str = None,
         model_filter: str = None,
         date_from: str = None,
-        date_to: str = None
+        date_to: str = None,
+        request_id_filter: str = None
     ) -> tuple[List[Session], int]:
         """Get sessions list with filtering."""
         db = self.session_factory()
@@ -82,6 +83,10 @@ class Database:
             # Apply filters
             if session_id_filter:
                 query = query.filter(Session.session_id.contains(session_id_filter))
+            if request_id_filter:
+                # Join with requests table to filter by request_id
+                query = query.join(Request, Session.session_id == Request.session_id)
+                query = query.filter(Request.request_id.contains(request_id_filter))
             if model_filter:
                 query = query.filter(Session.model == model_filter)
             if date_from:

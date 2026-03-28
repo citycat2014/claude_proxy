@@ -11,6 +11,7 @@ export const useSessionsStore = defineStore('sessions', {
     error: null,
     filters: {
       sessionId: '',
+      requestId: '',
       model: '',
       dateFrom: '',
       dateTo: ''
@@ -22,7 +23,7 @@ export const useSessionsStore = defineStore('sessions', {
 
   getters: {
     hasFilters: (state) => {
-      return state.filters.sessionId || state.filters.model ||
+      return state.filters.sessionId || state.filters.requestId || state.filters.model ||
              state.filters.dateFrom || state.filters.dateTo
     }
   },
@@ -40,6 +41,7 @@ export const useSessionsStore = defineStore('sessions', {
         })
 
         if (this.filters.sessionId) params.append('session_id', this.filters.sessionId)
+        if (this.filters.requestId) params.append('request_id', this.filters.requestId)
         if (this.filters.model) params.append('model', this.filters.model)
         if (this.filters.dateFrom) params.append('date_from', this.filters.dateFrom)
         if (this.filters.dateTo) params.append('date_to', this.filters.dateTo)
@@ -90,6 +92,7 @@ export const useSessionsStore = defineStore('sessions', {
     clearFilters() {
       this.filters = {
         sessionId: '',
+        requestId: '',
         model: '',
         dateFrom: '',
         dateTo: ''

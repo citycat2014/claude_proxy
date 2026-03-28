@@ -18,6 +18,16 @@
             style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary);"
           />
         </div>
+        <div class="filter-group" style="flex: 1; min-width: 200px;">
+          <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">Request ID</label>
+          <input
+            v-model="filters.requestId"
+            type="text"
+            placeholder="Search request ID..."
+            @keyup.enter="applyFilters"
+            style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary);"
+          />
+        </div>
         <div class="filter-group" style="flex: 1; min-width: 150px;">
           <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">Model</label>
           <select v-model="filters.model" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary);">
@@ -156,6 +166,7 @@ const store = useSessionsStore()
 
 const filters = ref({
   sessionId: '',
+  requestId: '',
   model: '',
   dateFrom: '',
   dateTo: ''
@@ -179,6 +190,7 @@ const displayedPages = computed(() => {
 function applyFilters() {
   store.setFilters({
     sessionId: filters.value.sessionId,
+    requestId: filters.value.requestId,
     model: filters.value.model,
     dateFrom: filters.value.dateFrom,
     dateTo: filters.value.dateTo
@@ -188,6 +200,7 @@ function applyFilters() {
 function clearFilters() {
   filters.value = {
     sessionId: '',
+    requestId: '',
     model: '',
     dateFrom: '',
     dateTo: ''

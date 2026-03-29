@@ -97,6 +97,19 @@ class Request(Base):
     response_text = Column(Text, nullable=True)
     response_thinking = Column(Text, nullable=True)
 
+    # Phase timings (in milliseconds)
+    dns_ms = Column(Integer, nullable=True)           # DNS lookup time
+    connect_ms = Column(Integer, nullable=True)       # TCP connection time
+    tls_ms = Column(Integer, nullable=True)           # TLS handshake time
+    send_ms = Column(Integer, nullable=True)          # Request send time
+    wait_ms = Column(Integer, nullable=True)          # Server processing time (TTFB)
+    receive_ms = Column(Integer, nullable=True)       # Response receive time
+
+    # Streaming-specific timings
+    time_to_first_token_ms = Column(Integer, nullable=True)   # Time to first token
+    time_to_last_token_ms = Column(Integer, nullable=True)    # Time to last token
+    avg_token_latency_ms = Column(Integer, nullable=True)     # Average inter-token latency
+
     # Relationships
     session = relationship("Session", back_populates="requests")
     tool_calls = relationship("ToolCall", back_populates="request", lazy="dynamic")
@@ -139,6 +152,15 @@ class Request(Base):
             "response_body": self.response_body,
             "response_text": self.response_text,
             "response_thinking": self.response_thinking,
+            "dns_ms": self.dns_ms,
+            "connect_ms": self.connect_ms,
+            "tls_ms": self.tls_ms,
+            "send_ms": self.send_ms,
+            "wait_ms": self.wait_ms,
+            "receive_ms": self.receive_ms,
+            "time_to_first_token_ms": self.time_to_first_token_ms,
+            "time_to_last_token_ms": self.time_to_last_token_ms,
+            "avg_token_latency_ms": self.avg_token_latency_ms,
         }
 
 
@@ -235,6 +257,30 @@ class Statistics(Base):
             "total_output_tokens": self.total_output_tokens,
             "total_cost": self.total_cost,
             "avg_response_time_ms": self.avg_response_time_ms,
+        }
+
+
+class SystemReminder(Base):
+    """Deduplicated system-reminder content."""
+    __tablename__ = 'system_reminders'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    content_hash = Column(String(64), unique=True, nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    first_seen_at = Column(DateTime, default=datetime.now)
+    use_count = Column(Integer, default=1)
+
+    __table_args__ = (
+        Index('idx_system_reminders_hash', 'content_hash'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "content_hash": self.content_hash,
+            "content": self.content[:200] + "..." if len(self.content) > 200 else self.content,
+            "first_seen_at": self.first_seen_at.isoformat() if self.first_seen_at else None,
+            "use_count": self.use_count,
         }
 
 

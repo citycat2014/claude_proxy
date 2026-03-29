@@ -7,6 +7,7 @@ Handles parsing of streaming response events and reconstructing the complete res
 import json
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
+from datetime import datetime
 
 
 @dataclass
@@ -45,6 +46,12 @@ class ParsedResponse:
     # Accumulated content (for convenience)
     text_content: str = ""  # 累积的文本内容
     thinking_content: str = ""  # 累积的思考内容
+
+    # Timing metrics
+    first_token_time: Optional[datetime] = None
+    last_token_time: Optional[datetime] = None
+    token_count: int = 0
+    total_generation_ms: int = 0
 
     def get_text_content(self) -> str:
         """Get all text content from response."""
@@ -106,6 +113,7 @@ class SSEParser:
     def __init__(self):
         self.response = ParsedResponse()
         self._current_block: Optional[ContentBlock] = None
+        self._start_time: Optional[datetime] = None
 
     def feed(self, chunk: bytes) -> List[Dict[str, Any]]:
         """
@@ -117,6 +125,10 @@ class SSEParser:
         Returns:
             List of parsed events
         """
+        # Initialize start time on first feed
+        if self._start_time is None:
+            self._start_time = datetime.now()
+
         events = []
 
         try:
@@ -214,6 +226,8 @@ class SSEParser:
             text = delta.get("text", "")
             self._current_block.text += text
             self.response.text_content += text
+            # Record token timing
+            self._record_token()
 
         elif delta_type == "input_json_delta":
             # Accumulate tool input JSON
@@ -224,6 +238,8 @@ class SSEParser:
             thinking = delta.get("thinking", "")
             self._current_block.text += thinking
             self.response.thinking_content += thinking
+            # Record token timing
+            self._record_token()
 
     def _handle_content_block_stop(self, event: Dict[str, Any]):
         """Handle content_block_stop event."""
@@ -268,8 +284,19 @@ class SSEParser:
 
     def _handle_message_stop(self, event: Dict[str, Any]):
         """Handle message_stop event."""
-        # Message is complete, nothing special to do
-        pass
+        # Message is complete, finalize timing
+        if self._start_time and self.response.last_token_time:
+            self.response.total_generation_ms = int(
+                (self.response.last_token_time - self.response.first_token_time).total_seconds() * 1000
+            )
+
+    def _record_token(self):
+        """Record a token arrival time."""
+        now = datetime.now()
+        if self.response.first_token_time is None:
+            self.response.first_token_time = now
+        self.response.last_token_time = now
+        self.response.token_count += 1
 
     def get_response(self) -> ParsedResponse:
         """Get the parsed response."""

@@ -55,6 +55,7 @@ export const useSessionsStore = defineStore('sessions', {
         this.totalPages = data.total_pages
       } catch (err) {
         this.error = err.message
+        console.error('Failed to fetch sessions:', err)
       } finally {
         this.loading = false
       }
@@ -79,6 +80,7 @@ export const useSessionsStore = defineStore('sessions', {
         this.sessionPagination = data.pagination
       } catch (err) {
         this.error = err.message
+        console.error('Failed to fetch session detail:', err)
       } finally {
         this.loading = false
       }

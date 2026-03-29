@@ -441,6 +441,91 @@ class AnthropicHandler:
                             return os.path.dirname(tool_input["file_path"])
         return ""
 
+    @staticmethod
+    def extract_system_reminder(text: str) -> Tuple[str, Optional[str]]:
+        """
+        Extract system-reminder block from text.
+
+        Returns:
+            Tuple of (cleaned_text, system_reminder_content or None)
+        """
+        if "<system-reminder>" not in text:
+            return text, None
+
+        # Find all system-reminder blocks
+        import re
+        pattern = r'<system-reminder>.*?</system-reminder>'
+        matches = re.findall(pattern, text, re.DOTALL)
+
+        if not matches:
+            return text, None
+
+        # Remove system-reminder blocks from text
+        cleaned = re.sub(pattern, '', text, flags=re.DOTALL).strip()
+
+        # Concatenate all system-reminder content
+        system_content = '\n'.join(matches)
+
+        return cleaned, system_content
+
+    @staticmethod
+    def deduplicate_request_body(body: Dict[str, Any], db) -> Dict[str, Any]:
+        """
+        Process request body to deduplicate system-reminder content.
+
+        Args:
+            body: Request body dict
+            db: Database instance with save_system_reminder method
+
+        Returns:
+            Processed body with system-reminder references
+        """
+        if not body or "messages" not in body:
+            return body
+
+        messages = body.get("messages", [])
+        if not messages:
+            return body
+
+        processed_messages = []
+        for msg in messages:
+            if msg.get("role") != "user":
+                processed_messages.append(msg)
+                continue
+
+            content = msg.get("content", "")
+            if isinstance(content, list):
+                # Handle array content
+                processed_blocks = []
+                for block in content:
+                    if block.get("type") == "text":
+                        text = block.get("text", "")
+                        cleaned, system_reminder = AnthropicHandler.extract_system_reminder(text)
+                        if system_reminder and db:
+                            # Save to deduplication table
+                            content_hash = db.save_system_reminder(system_reminder)
+                            # Replace with reference
+                            block["text"] = f"[SYSTEM_REMINDER_REF:{content_hash}]\n{cleaned}".strip()
+                        else:
+                            block["text"] = cleaned
+                        processed_blocks.append(block)
+                    else:
+                        processed_blocks.append(block)
+                msg["content"] = processed_blocks
+            elif isinstance(content, str):
+                # Handle string content
+                cleaned, system_reminder = AnthropicHandler.extract_system_reminder(content)
+                if system_reminder and db:
+                    content_hash = db.save_system_reminder(system_reminder)
+                    msg["content"] = f"[SYSTEM_REMINDER_REF:{content_hash}]\n{cleaned}".strip()
+                else:
+                    msg["content"] = cleaned
+
+            processed_messages.append(msg)
+
+        body["messages"] = processed_messages
+        return body
+
 
 # Singleton instance
 handler = AnthropicHandler()

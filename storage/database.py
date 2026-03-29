@@ -6,12 +6,13 @@ Provides CRUD operations and queries using ORM instead of raw SQL.
 
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
+from contextlib import contextmanager
 
 from sqlalchemy import func, desc, and_, or_
 from sqlalchemy.orm import Session as DBSession, sessionmaker, joinedload
 
 from storage.models import (
-    engine, Session, Request, ToolCall, Message, Statistics
+    engine, Session, Request, ToolCall, Message, Statistics, SystemReminder
 )
 
 # Create session factory
@@ -29,12 +30,20 @@ class Database:
         """Get a new database session."""
         return self.session_factory()
 
+    @contextmanager
+    def db_session(self):
+        """Context manager for database sessions."""
+        db = self.session_factory()
+        try:
+            yield db
+        finally:
+            db.close()
+
     # ============ Session operations ============
 
     def upsert_session(self, session: Session) -> Session:
         """Insert or update a session."""
-        db = self.get_db_session()
-        try:
+        with self.db_session() as db:
             # Check if session exists
             existing = db.query(Session).filter_by(session_id=session.session_id).first()
 
@@ -54,16 +63,11 @@ class Database:
 
             db.commit()
             return session
-        finally:
-            db.close()
 
     def get_session(self, session_id: str) -> Optional[Session]:
         """Get a session by ID."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             return db.query(Session).filter_by(session_id=session_id).first()
-        finally:
-            db.close()
 
     def get_sessions(
         self,
@@ -76,8 +80,7 @@ class Database:
         request_id_filter: str = None
     ) -> tuple[List[Session], int]:
         """Get sessions list with filtering, ordered by most recent request time."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             # Subquery to get latest request timestamp for each session
             latest_request_subq = db.query(
                 Request.session_id,
@@ -130,28 +133,20 @@ class Database:
             sessions = [r[0] for r in results]  # Extract Session objects from tuple
 
             return sessions, total
-        finally:
-            db.close()
 
     # ============ Request operations ============
 
     def save_request(self, request: Request) -> Request:
         """Save a request."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             db.add(request)
             db.commit()
             return request
-        finally:
-            db.close()
 
     def get_request(self, request_id: str) -> Optional[Request]:
         """Get a request by ID."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             return db.query(Request).filter_by(request_id=request_id).first()
-        finally:
-            db.close()
 
     def get_requests_by_session(
         self,
@@ -160,56 +155,39 @@ class Database:
         offset: int = 0
     ) -> List[Request]:
         """Get requests for a session."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             return db.query(Request)\
                 .filter_by(session_id=session_id)\
                 .order_by(desc(Request.timestamp))\
                 .offset(offset)\
                 .limit(limit)\
                 .all()
-        finally:
-            db.close()
 
     def get_request_count_by_session(self, session_id: str) -> int:
         """Count requests for a session."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             return db.query(Request).filter_by(session_id=session_id).count()
-        finally:
-            db.close()
 
     # ============ Tool call operations ============
 
     def save_tool_call(self, tool_call: ToolCall) -> ToolCall:
         """Save a tool call."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             db.add(tool_call)
             db.commit()
             return tool_call
-        finally:
-            db.close()
 
     def get_tool_calls_by_request(self, request_id: str) -> List[Dict[str, Any]]:
         """Get tool calls for a request."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             tool_calls = db.query(ToolCall).filter_by(request_id=request_id).all()
             return [tc.to_dict() for tc in tool_calls]
-        finally:
-            db.close()
 
     # ============ Statistics operations ============
 
-    def get_summary_stats(self, hours: int = None) -> Dict[str, Any]:
-        """Get overall statistics summary (alias for get_statistics_summary)."""
-        return self.get_statistics_summary(hours)
-
     def get_statistics_summary(self, hours: int = None) -> Dict[str, Any]:
         """Get overall statistics summary."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             query = db.query(
                 func.count(Request.id).label('total_requests'),
                 func.sum(Request.input_tokens).label('total_input_tokens'),
@@ -243,17 +221,10 @@ class Database:
                 "total_cost": result.total_cost or 0.0,
                 "avg_response_time_ms": result.avg_response_time_ms or 0.0,
             }
-        finally:
-            db.close()
-
-    def get_summary_stats_with_time_filter(self, hours: int = None) -> Dict[str, Any]:
-        """Get summary stats with optional time filter."""
-        return self.get_statistics_summary(hours)
 
     def get_today_stats(self) -> Dict[str, Any]:
         """Get today's statistics."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
             result = db.query(
@@ -265,67 +236,59 @@ class Database:
                 "requests": result.requests or 0,
                 "cost": result.cost or 0.0
             }
-        finally:
-            db.close()
 
-    def get_timeline_stats(self, days: int = 7) -> List[Dict[str, Any]]:
-        """Get request volume by day."""
-        db = self.session_factory()
-        try:
-            since = datetime.now() - timedelta(days=days)
+    def get_timeline_stats(self, days: int = None, hours: int = None, minutes: int = None) -> List[Dict[str, Any]]:
+        """Get request volume with configurable granularity.
 
-            results = db.query(
-                func.date(Request.timestamp).label('date'),
-                func.count(Request.id).label('count')
-            ).filter(Request.timestamp >= since)\
-                .group_by(func.date(Request.timestamp))\
-                .order_by(func.date(Request.timestamp))\
-                .all()
+        Args:
+            days: Number of days for daily granularity
+            hours: Number of hours for hourly granularity
+            minutes: Number of minutes for minute granularity
 
-            return [{"date": str(r.date), "count": r.count} for r in results]
-        finally:
-            db.close()
+        Returns:
+            List of dicts with date/timestamp and count
+        """
+        with self.db_session() as db:
+            # Determine granularity and time range
+            if minutes:
+                since = datetime.now() - timedelta(minutes=minutes)
+                time_format = '%Y-%m-%dT%H:%M:00'
+                label = 'timestamp'
+            elif hours:
+                since = datetime.now() - timedelta(hours=hours)
+                time_format = '%Y-%m-%dT%H:00:00'
+                label = 'timestamp'
+            else:
+                # Default to days
+                days = days or 7
+                since = datetime.now() - timedelta(days=days)
+                time_format = None  # Use func.date for daily
+                label = 'date'
 
-    def get_timeline_stats_hourly(self, hours: int = 24) -> List[Dict[str, Any]]:
-        """Get request volume by hour."""
-        db = self.session_factory()
-        try:
-            since = datetime.now() - timedelta(hours=hours)
-
-            results = db.query(
-                func.strftime('%Y-%m-%dT%H:00:00', Request.timestamp).label('timestamp'),
-                func.count(Request.id).label('count')
-            ).filter(Request.timestamp >= since)\
-                .group_by(func.strftime('%Y-%m-%dT%H:00:00', Request.timestamp))\
-                .order_by(func.strftime('%Y-%m-%dT%H:00:00', Request.timestamp))\
-                .all()
-
-            return [{"timestamp": r.timestamp, "count": r.count} for r in results]
-        finally:
-            db.close()
-
-    def get_timeline_stats_minute(self, minutes: int = 60) -> List[Dict[str, Any]]:
-        """Get request volume by minute."""
-        db = self.session_factory()
-        try:
-            since = datetime.now() - timedelta(minutes=minutes)
-
-            results = db.query(
-                func.strftime('%Y-%m-%dT%H:%M:00', Request.timestamp).label('timestamp'),
-                func.count(Request.id).label('count')
-            ).filter(Request.timestamp >= since)\
-                .group_by(func.strftime('%Y-%m-%dT%H:%M:00', Request.timestamp))\
-                .order_by(func.strftime('%Y-%m-%dT%H:%M:00', Request.timestamp))\
-                .all()
-
-            return [{"timestamp": r.timestamp, "count": r.count} for r in results]
-        finally:
-            db.close()
+            if time_format:
+                # Hourly or minute granularity
+                results = db.query(
+                    func.strftime(time_format, Request.timestamp).label(label),
+                    func.count(Request.id).label('count')
+                ).filter(Request.timestamp >= since)\
+                    .group_by(func.strftime(time_format, Request.timestamp))\
+                    .order_by(func.strftime(time_format, Request.timestamp))\
+                    .all()
+                return [{label: r[0], "count": r[1]} for r in results]
+            else:
+                # Daily granularity
+                results = db.query(
+                    func.date(Request.timestamp).label(label),
+                    func.count(Request.id).label('count')
+                ).filter(Request.timestamp >= since)\
+                    .group_by(func.date(Request.timestamp))\
+                    .order_by(func.date(Request.timestamp))\
+                    .all()
+                return [{label: str(r.date), "count": r.count} for r in results]
 
     def get_model_distribution(self, hours: int = None) -> Dict[str, Dict[str, Any]]:
         """Get model usage distribution."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             query = db.query(
                 Request.model,
                 func.count(Request.id).label('requests'),
@@ -347,13 +310,10 @@ class Database:
                 }
                 for r in results
             }
-        finally:
-            db.close()
 
     def get_usage_by_model(self) -> List[Dict[str, Any]]:
         """Get token usage by model."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             results = db.query(
                 Request.model,
                 func.sum(Request.input_tokens).label('input_tokens'),
@@ -371,13 +331,10 @@ class Database:
                 }
                 for r in results
             ]
-        finally:
-            db.close()
 
     def get_cache_statistics(self) -> Dict[str, Any]:
         """Get cache statistics."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             result = db.query(
                 func.sum(Request.cache_read_tokens).label('tokens_from_cache'),
                 func.count(Request.id).filter(Request.cache_read_tokens > 0).label('cache_hits'),
@@ -389,13 +346,10 @@ class Database:
                 "cache_hits": result.cache_hits or 0,
                 "cache_misses": result.cache_misses or 0
             }
-        finally:
-            db.close()
 
     def get_daily_costs(self) -> List[Dict[str, Any]]:
         """Get daily cost aggregation."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             results = db.query(
                 func.date(Request.timestamp).label('date'),
                 func.sum(Request.cost).label('cost')
@@ -404,23 +358,17 @@ class Database:
                 .limit(30).all()
 
             return [{"date": str(r.date), "cost": r.cost or 0.0} for r in results]
-        finally:
-            db.close()
 
     def get_requests(self, limit: int = 1000) -> List[Request]:
         """Get requests list."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             return db.query(Request).order_by(desc(Request.timestamp)).limit(limit).all()
-        finally:
-            db.close()
 
     # ============ Tool usage operations ============
 
     def get_tool_usage_stats(self, hours: int = None) -> List[Any]:
         """Get tool usage statistics."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             query = db.query(
                 ToolCall.tool_name,
                 func.count(ToolCall.id).label('total_calls'),
@@ -437,28 +385,22 @@ class Database:
 
             # Return named tuples that have attributes
             return results
-        finally:
-            db.close()
 
     def get_tool_usage_by_hour(self) -> List[Dict[str, Any]]:
         """Get tool usage by hour."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             results = db.query(
                 func.strftime('%H', ToolCall.timestamp).label('hour'),
                 func.count(ToolCall.id).label('count')
             ).group_by(func.strftime('%H', ToolCall.timestamp)).all()
 
             return [{"hour": int(r.hour), "count": r.count} for r in results]
-        finally:
-            db.close()
 
     # ============ Analysis module compatibility ============
 
     def get_tool_usage_stats_with_time_filter(self, hours: int = None) -> List[Dict[str, Any]]:
         """Get tool usage stats with optional time filter (for ToolAnalyzer)."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             query = db.query(
                 ToolCall.tool_name,
                 func.count(ToolCall.id).label('count'),
@@ -479,14 +421,10 @@ class Database:
                 }
                 for r in results
             ]
-        finally:
-            db.close()
-            db.close()
 
     def get_model_usage_stats_with_time_filter(self, hours: int = None) -> List[Dict[str, Any]]:
         """Get model usage stats with optional time filter (for StatisticsEngine)."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             query = db.query(
                 Request.model,
                 func.count(Request.id).label('count')
@@ -502,13 +440,10 @@ class Database:
                 {"model": r.model, "count": r.count}
                 for r in results
             ]
-        finally:
-            db.close()
 
     def get_model_usage_stats(self) -> List[Dict[str, Any]]:
         """Get model usage stats (for TokenAnalyzer)."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             results = db.query(
                 Request.model,
                 func.sum(Request.input_tokens).label('total_input_tokens'),
@@ -526,38 +461,180 @@ class Database:
                 }
                 for r in results
             ]
-        finally:
-            db.close()
 
     def get_session_count(self) -> int:
         """Get total session count (for StatisticsEngine)."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             return db.query(func.count(Session.id)).scalar() or 0
-        finally:
-            db.close()
 
     def get_avg_requests_per_session(self) -> float:
         """Get average requests per session (for StatisticsEngine)."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             total_requests = db.query(func.count(Request.id)).scalar() or 0
             total_sessions = db.query(func.count(Session.id)).scalar() or 0
             if total_sessions == 0:
                 return 0.0
             return total_requests / total_sessions
-        finally:
-            db.close()
 
     def get_avg_tokens_per_session(self) -> float:
         """Get average tokens per session (for StatisticsEngine)."""
-        db = self.session_factory()
-        try:
+        with self.db_session() as db:
             total_input = db.query(func.sum(Request.input_tokens)).scalar() or 0
             total_output = db.query(func.sum(Request.output_tokens)).scalar() or 0
             total_sessions = db.query(func.count(Session.id)).scalar() or 0
             if total_sessions == 0:
                 return 0.0
             return (total_input + total_output) / total_sessions
-        finally:
-            db.close()
+
+    # ============ Timing statistics ============
+
+    def get_timing_statistics(self, hours: Optional[int] = None) -> Dict[str, Any]:
+        """Get timing statistics for requests."""
+        with self.db_session() as db:
+            query = db.query(
+                func.avg(Request.connect_ms).label('avg_connect_ms'),
+                func.avg(Request.tls_ms).label('avg_tls_ms'),
+                func.avg(Request.send_ms).label('avg_send_ms'),
+                func.avg(Request.wait_ms).label('avg_wait_ms'),
+                func.avg(Request.receive_ms).label('avg_receive_ms'),
+                func.avg(Request.time_to_first_token_ms).label('avg_ttf_token_ms'),
+                func.avg(Request.avg_token_latency_ms).label('avg_token_latency_ms'),
+                func.avg(Request.response_time_ms).label('avg_response_time_ms'),
+            )
+
+            if hours:
+                since = datetime.now() - timedelta(hours=hours)
+                query = query.filter(Request.timestamp >= since)
+
+            result = query.first()
+
+            return {
+                "avg_connect_ms": result.avg_connect_ms or 0,
+                "avg_tls_ms": result.avg_tls_ms or 0,
+                "avg_send_ms": result.avg_send_ms or 0,
+                "avg_wait_ms": result.avg_wait_ms or 0,
+                "avg_receive_ms": result.avg_receive_ms or 0,
+                "avg_time_to_first_token_ms": result.avg_ttf_token_ms or 0,
+                "avg_token_latency_ms": result.avg_token_latency_ms or 0,
+                "avg_response_time_ms": result.avg_response_time_ms or 0,
+            }
+
+    def get_response_time_percentiles(self, hours: Optional[int] = None) -> Dict[str, float]:
+        """Get response time percentiles (P50, P95, P99)."""
+        with self.db_session() as db:
+            query = db.query(Request.response_time_ms)
+
+            if hours:
+                since = datetime.now() - timedelta(hours=hours)
+                query = query.filter(Request.timestamp >= since)
+
+            results = query.all()
+            times = [r[0] for r in results if r[0] is not None]
+
+            if not times:
+                return {"p50": 0, "p95": 0, "p99": 0}
+
+            times.sort()
+            n = len(times)
+
+            def percentile(p: float) -> float:
+                idx = int(n * p / 100)
+                return times[min(idx, n - 1)]
+
+            return {
+                "p50": percentile(50),
+                "p95": percentile(95),
+                "p99": percentile(99),
+            }
+
+    def get_timing_breakdown_by_model(self, hours: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get timing breakdown grouped by model."""
+        with self.db_session() as db:
+            query = db.query(
+                Request.model,
+                func.avg(Request.connect_ms).label('avg_connect_ms'),
+                func.avg(Request.tls_ms).label('avg_tls_ms'),
+                func.avg(Request.wait_ms).label('avg_wait_ms'),
+                func.avg(Request.receive_ms).label('avg_receive_ms'),
+                func.avg(Request.response_time_ms).label('avg_response_time_ms'),
+                func.count(Request.id).label('request_count'),
+            ).filter(Request.model.isnot(None))
+
+            if hours:
+                since = datetime.now() - timedelta(hours=hours)
+                query = query.filter(Request.timestamp >= since)
+
+            results = query.group_by(Request.model).all()
+
+            return [
+                {
+                    "model": r.model,
+                    "avg_connect_ms": r.avg_connect_ms or 0,
+                    "avg_tls_ms": r.avg_tls_ms or 0,
+                    "avg_wait_ms": r.avg_wait_ms or 0,
+                    "avg_receive_ms": r.avg_receive_ms or 0,
+                    "avg_response_time_ms": r.avg_response_time_ms or 0,
+                    "request_count": r.request_count,
+                }
+                for r in results
+            ]
+
+    # ============ System Reminder Deduplication ============
+
+    def save_system_reminder(self, content: str) -> str:
+        """
+        Save system-reminder content with deduplication.
+        Returns the content_hash for reference.
+        """
+        import hashlib
+        content_hash = hashlib.sha256(content.encode()).hexdigest()[:64]
+
+        with self.db_session() as db:
+            # Check if exists
+            existing = db.query(SystemReminder).filter_by(content_hash=content_hash).first()
+            if existing:
+                existing.use_count += 1
+                db.commit()
+                return content_hash
+
+            # Create new
+            reminder = SystemReminder(
+                content_hash=content_hash,
+                content=content,
+                first_seen_at=datetime.now(),
+                use_count=1
+            )
+            db.add(reminder)
+            db.commit()
+            return content_hash
+
+    def get_system_reminder(self, content_hash: str) -> Optional[SystemReminder]:
+        """Get system-reminder by hash."""
+        with self.db_session() as db:
+            return db.query(SystemReminder).filter_by(content_hash=content_hash).first()
+
+    def get_system_reminder_stats(self) -> Dict[str, Any]:
+        """Get statistics about system-reminder deduplication."""
+        with self.db_session() as db:
+            total = db.query(func.count(SystemReminder.id)).scalar() or 0
+            total_uses = db.query(func.sum(SystemReminder.use_count)).scalar() or 0
+            total_bytes = db.query(func.sum(func.length(SystemReminder.content))).scalar() or 0
+
+            # Calculate savings
+            unique_content_size = total_bytes
+            if total > 0:
+                avg_size_per_reminder = total_bytes / total
+                estimated_without_dedup = avg_size_per_reminder * total_uses
+                savings_bytes = estimated_without_dedup - unique_content_size
+                savings_percent = (savings_bytes / estimated_without_dedup * 100) if estimated_without_dedup > 0 else 0
+            else:
+                savings_bytes = 0
+                savings_percent = 0
+
+            return {
+                "unique_count": total,
+                "total_uses": total_uses,
+                "unique_size_bytes": unique_content_size,
+                "savings_bytes": int(savings_bytes),
+                "savings_percent": round(savings_percent, 2),
+            }

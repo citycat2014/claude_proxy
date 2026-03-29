@@ -212,6 +212,8 @@ class TestStatisticsAPI:
         mock_summary.total_sessions = 10
         mock_summary.total_input_tokens = 50000
         mock_summary.total_output_tokens = 20000
+        mock_summary.cache_creation_tokens = 1000
+        mock_summary.cache_read_tokens = 2000
         mock_summary.total_cost = 5.0
         mock_summary.avg_response_time_ms = 1500
         mock_summary.requests_today = 20

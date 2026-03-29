@@ -32,7 +32,7 @@ class StatisticsEngine:
 
     def get_summary(self, hours: Optional[int] = None) -> SummaryStats:
         """Get overall summary statistics with optional time filter."""
-        stats = self.db.get_summary_stats_with_time_filter(hours)
+        stats = self.db.get_statistics_summary(hours)
         today_stats = self.db.get_today_stats()
 
         return SummaryStats(
@@ -52,24 +52,23 @@ class StatisticsEngine:
         """Get request volume over time with optional filter."""
         if hours and hours <= 1:
             # Use minute-level grouping for very short time ranges (< 1 hour)
-            minutes = int(hours * 60)
-            return self.db.get_timeline_stats_minute(minutes)
-        elif hours and hours <= 24:
+            return self.db.get_timeline_stats(minutes=int(hours * 60))
+        elif hours:
             # Use hourly grouping for short time ranges
-            return self.db.get_timeline_stats_hourly(int(hours))
+            return self.db.get_timeline_stats(hours=int(hours))
         elif days:
-            return self.db.get_timeline_stats(days)
+            return self.db.get_timeline_stats(days=days)
         else:
-            return self.db.get_timeline_stats(7)
+            return self.db.get_timeline_stats(days=7)
 
     def get_cost_timeline(self, hours: Optional[int] = None, days: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get cost over time with optional filter."""
-        if hours and hours <= 24:
-            timeline = self.db.get_timeline_stats_hourly(hours)
+        if hours:
+            timeline = self.db.get_timeline_stats(hours=hours)
         elif days:
-            timeline = self.db.get_timeline_stats(days)
+            timeline = self.db.get_timeline_stats(days=days)
         else:
-            timeline = self.db.get_timeline_stats(7)
+            timeline = self.db.get_timeline_stats(days=7)
 
         return [
             {
@@ -95,14 +94,38 @@ class StatisticsEngine:
         # Placeholder
         return {i: 0 for i in range(24)}
 
-    def get_response_time_stats(self) -> Dict[str, float]:
+    def get_response_time_stats(self, hours: Optional[int] = None) -> Dict[str, float]:
         """Get response time statistics."""
-        stats = self.db.get_summary_stats()
+        stats = self.db.get_timing_statistics(hours)
+        percentiles = self.db.get_response_time_percentiles(hours)
 
         return {
             "avg_ms": stats.get("avg_response_time_ms", 0),
             "min_ms": 0,  # Would need separate query
             "max_ms": 0,  # Would need separate query
+            "p50_ms": percentiles.get("p50", 0),
+            "p95_ms": percentiles.get("p95", 0),
+            "p99_ms": percentiles.get("p99", 0),
+        }
+
+    def get_timing_breakdown(self, hours: Optional[int] = None) -> Dict[str, Any]:
+        """Get detailed timing breakdown."""
+        stats = self.db.get_timing_statistics(hours)
+        by_model = self.db.get_timing_breakdown_by_model(hours)
+
+        return {
+            "overall": stats,
+            "by_model": by_model,
+        }
+
+    def get_streaming_latency_stats(self, hours: Optional[int] = None) -> Dict[str, Any]:
+        """Get streaming-specific latency statistics."""
+        stats = self.db.get_timing_statistics(hours)
+
+        return {
+            "avg_time_to_first_token_ms": stats.get("avg_time_to_first_token_ms", 0),
+            "avg_token_latency_ms": stats.get("avg_token_latency_ms", 0),
+            "avg_wait_ms": stats.get("avg_wait_ms", 0),
         }
 
     def get_session_stats(self) -> Dict[str, Any]:

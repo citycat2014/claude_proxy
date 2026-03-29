@@ -117,6 +117,16 @@ def serialize_request(req, include_tool_calls: bool = False):
         "response_text": req.response_text,
         "response_thinking": req.response_thinking,
         "user_input_preview": extract_user_input_preview(req.messages_json),
+        # Timing fields
+        "dns_ms": req.dns_ms,
+        "connect_ms": req.connect_ms,
+        "tls_ms": req.tls_ms,
+        "send_ms": req.send_ms,
+        "wait_ms": req.wait_ms,
+        "receive_ms": req.receive_ms,
+        "time_to_first_token_ms": req.time_to_first_token_ms,
+        "time_to_last_token_ms": req.time_to_last_token_ms,
+        "avg_token_latency_ms": req.avg_token_latency_ms,
     }
 
     if include_tool_calls:
@@ -243,6 +253,27 @@ def api_statistics_tools():
         }
         for s in stats
     ])
+
+
+@app.route("/api/statistics/timing")
+def api_statistics_timing():
+    """Get detailed timing statistics."""
+    hours = request.args.get("hours", None, type=int)
+    return jsonify(stats_engine.get_timing_breakdown(hours=hours))
+
+
+@app.route("/api/statistics/latency")
+def api_statistics_latency():
+    """Get response time latency statistics (P50, P95, P99)."""
+    hours = request.args.get("hours", None, type=int)
+    return jsonify(stats_engine.get_response_time_stats(hours=hours))
+
+
+@app.route("/api/statistics/streaming")
+def api_statistics_streaming():
+    """Get streaming-specific latency statistics."""
+    hours = request.args.get("hours", None, type=int)
+    return jsonify(stats_engine.get_streaming_latency_stats(hours=hours))
 
 
 @app.route("/api/sessions")
@@ -389,8 +420,8 @@ def api_export_session(session_id):
     requests = db.get_requests_by_session(session_id)
 
     return jsonify({
-        "session": session,
-        "requests": requests,
+        "session": serialize_session(session),
+        "requests": [serialize_request(req) for req in requests],
     })
 
 

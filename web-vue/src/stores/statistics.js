@@ -33,6 +33,7 @@ export const useStatisticsStore = defineStore('statistics', {
         this.summary = await response.json()
       } catch (err) {
         this.error = err.message
+        console.error('Failed to fetch summary:', err)
       } finally {
         this.loading = false
       }

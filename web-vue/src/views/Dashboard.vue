@@ -12,6 +12,7 @@
         <option :value="1">Last 1 Hour</option>
         <option :value="5">Last 5 Hours</option>
         <option :value="24">Last 24 Hours</option>
+        <option :value="168">Last 7 Days</option>
         <option :value="720">Last 30 Days</option>
         <option :value="null">All Time</option>
       </select>
@@ -98,6 +99,53 @@
       </div>
     </div>
 
+    <!-- Timing Analysis Row -->
+    <div class="charts-grid" style="margin-top: 20px;">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="bi bi-stopwatch"></i>
+            Response Time Breakdown
+          </h3>
+          <span class="text-muted" style="font-size: 12px;">Average phase timing (ms)</span>
+        </div>
+        <div class="card-body">
+          <canvas ref="timingChart" height="200"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="bi bi-speedometer2"></i>
+            Latency Percentiles
+            <i class="bi bi-question-circle" style="font-size: 14px; margin-left: 8px; color: var(--text-muted); cursor: help;"
+               title="Percentiles show the distribution of response times. P50 means half of requests are faster. P95 means 95% of requests are faster (only 5% slower). P99 captures outliers."></i>
+          </h3>
+        </div>
+        <div class="card-body">
+          <div class="latency-stats">
+            <div class="latency-item" title="P50 (Median): 50% of requests are faster than this value. Half of all requests complete within this time.">
+              <div class="latency-label">P50 (Median)</div>
+              <div class="latency-value">{{ formatNumber(timingStats.p50_ms) }} ms</div>
+            </div>
+            <div class="latency-item" title="P95: 95% of requests are faster than this value. Only 5% of requests are slower.">
+              <div class="latency-label">P95</div>
+              <div class="latency-value">{{ formatNumber(timingStats.p95_ms) }} ms</div>
+            </div>
+            <div class="latency-item" title="P99: 99% of requests are faster than this value. Only 1% of requests (outliers) are slower.">
+              <div class="latency-label">P99</div>
+              <div class="latency-value">{{ formatNumber(timingStats.p99_ms) }} ms</div>
+            </div>
+            <div class="latency-item" title="Average: Sum of all response times divided by number of requests. Can be skewed by outliers.">
+              <div class="latency-label">Average</div>
+              <div class="latency-value">{{ formatNumber(timingStats.avg_ms) }} ms</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Bottom Row -->
     <div class="section-grid section-grid-2">
       <div class="card">
@@ -115,28 +163,26 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">
-            <i class="bi bi-clock-history"></i>
-            Recent Sessions
+            <i class="bi bi-lightning-charge"></i>
+            Streaming Latency
+            <i class="bi bi-question-circle" style="font-size: 14px; margin-left: 8px; color: var(--text-muted); cursor: help;"
+               title="Streaming metrics measure the real-time response characteristics. Lower times indicate faster, more responsive streaming."></i>
           </h3>
-          <router-link to="/sessions" class="btn btn-sm btn-outline">View All</router-link>
         </div>
-        <div class="card-body" style="padding: 0;">
-          <ul class="list-group" v-if="recentSessions.length > 0">
-            <li v-for="session in recentSessions" :key="session.session_id" class="list-item">
-              <div class="list-item-content">
-                <div class="list-item-title">{{ session.session_id.substring(0, 16) }}...</div>
-                <div class="list-item-subtitle">{{ formatDateTime(session.started_at) }}</div>
-              </div>
-              <div class="list-item-meta">
-                <router-link :to="`/sessions/${session.session_id}`" class="btn btn-sm btn-outline">
-                  <i class="bi bi-eye"></i> View
-                </router-link>
-              </div>
-            </li>
-          </ul>
-          <div v-else class="empty-state">
-            <div class="empty-state-icon"><i class="bi bi-collection"></i></div>
-            <div class="empty-state-title">No sessions yet</div>
+        <div class="card-body">
+          <div class="streaming-stats">
+            <div class="streaming-item" title="Time from sending request to receiving the first token in the streaming response. Includes network latency + server processing time.">
+              <div class="streaming-label">Time to First Token</div>
+              <div class="streaming-value">{{ formatNumber(streamingStats.avg_time_to_first_token_ms) }} ms</div>
+            </div>
+            <div class="streaming-item" title="Average time between consecutive tokens in the streaming response. Lower is better for smooth streaming.">
+              <div class="streaming-label">Avg Token Latency</div>
+              <div class="streaming-value">{{ formatNumber(streamingStats.avg_token_latency_ms) }} ms</div>
+            </div>
+            <div class="streaming-item" title="Time To First Byte (TTFB): Server processing time from receiving the request to sending the first byte of response. Pure server-side latency.">
+              <div class="streaming-label">Server Processing (TTFB)</div>
+              <div class="streaming-value">{{ formatNumber(timingBreakdown.avg_wait_ms) }} ms</div>
+            </div>
           </div>
         </div>
       </div>
@@ -160,18 +206,33 @@ const timeFilter = ref(statsStore.timeFilter)
 const requestsChart = ref(null)
 const modelsChart = ref(null)
 const toolsChart = ref(null)
+const timingChart = ref(null)
 
 let requestsChartInstance = null
 let modelsChartInstance = null
 let toolsChartInstance = null
+let timingChartInstance = null
 let lastTimeFilter = null
 
 const stats = computed(() => statsStore)
 const toolStats = ref([])
+const timingStats = ref({ avg_ms: 0, p50_ms: 0, p95_ms: 0, p99_ms: 0 })
+const timingBreakdown = ref({
+  avg_connect_ms: 0,
+  avg_tls_ms: 0,
+  avg_send_ms: 0,
+  avg_wait_ms: 0,
+  avg_receive_ms: 0
+})
+const streamingStats = ref({
+  avg_time_to_first_token_ms: 0,
+  avg_token_latency_ms: 0
+})
 const recentSessions = ref([])
 
 const chartSubtitle = computed(() => {
   if (timeFilter.value === 720) return 'Last 30 days'
+  if (timeFilter.value === 168) return 'Last 7 days'
   if (timeFilter.value === 24) return 'Last 24 hours'
   if (timeFilter.value === 5) return 'Last 5 hours'
   if (timeFilter.value === 1) return 'Last 1 hour'
@@ -192,6 +253,9 @@ async function loadDashboardData() {
   if (timeFilter.value === 720) {
     // 30 days
     await chartsStore.fetchTimeline(null, 30)
+  } else if (timeFilter.value === 168) {
+    // 7 days
+    await chartsStore.fetchTimeline(null, 7)
   } else if (timeFilter.value) {
     // Hours-based filter
     await chartsStore.fetchTimeline(timeFilter.value, null)
@@ -219,6 +283,36 @@ async function loadDashboardData() {
   // Load recent sessions
   await sessionsStore.fetchSessions(1)
   recentSessions.value = sessionsStore.sessions.slice(0, 5)
+
+  // Load timing statistics
+  await loadTimingData()
+}
+
+async function loadTimingData() {
+  try {
+    // Load latency stats
+    const latencyResponse = await fetch(`/api/statistics/latency?hours=${timeFilter.value || ''}`)
+    if (latencyResponse.ok) {
+      timingStats.value = await latencyResponse.json()
+    }
+
+    // Load timing breakdown
+    const timingResponse = await fetch(`/api/statistics/timing?hours=${timeFilter.value || ''}`)
+    if (timingResponse.ok) {
+      const timing = await timingResponse.json()
+      timingBreakdown.value = timing.overall || {}
+    }
+
+    // Load streaming stats
+    const streamingResponse = await fetch(`/api/statistics/streaming?hours=${timeFilter.value || ''}`)
+    if (streamingResponse.ok) {
+      streamingStats.value = await streamingResponse.json()
+    }
+
+    updateTimingChart()
+  } catch (err) {
+    console.error('Failed to load timing data:', err)
+  }
 }
 
 function updateRequestsChart() {
@@ -374,6 +468,56 @@ function updateToolsChart() {
   })
 }
 
+function updateTimingChart() {
+  if (!timingChart.value) return
+
+  const labels = ['Connect', 'TLS', 'Send', 'Wait', 'Receive']
+  const data = [
+    timingBreakdown.value.avg_connect_ms || 0,
+    timingBreakdown.value.avg_tls_ms || 0,
+    timingBreakdown.value.avg_send_ms || 0,
+    timingBreakdown.value.avg_wait_ms || 0,
+    timingBreakdown.value.avg_receive_ms || 0
+  ]
+
+  if (timingChartInstance) {
+    timingChartInstance.destroy()
+  }
+
+  timingChartInstance = new Chart(timingChart.value, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Time (ms)',
+        data,
+        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: '#e2e8f0' },
+          title: {
+            display: true,
+            text: 'Milliseconds'
+          }
+        },
+        x: {
+          grid: { display: false }
+        }
+      }
+    }
+  })
+}
+
 onMounted(() => {
   loadDashboardData()
 })
@@ -381,4 +525,39 @@ onMounted(() => {
 watch(() => chartsStore.timelineData, updateRequestsChart)
 watch(() => chartsStore.modelDistribution, updateModelsChart)
 watch(() => toolStats.value, updateToolsChart)
+watch(() => timeFilter.value, loadTimingData)
 </script>
+
+<style scoped>
+.latency-stats, .streaming-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.latency-item, .streaming-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  cursor: help;
+  transition: background 0.2s;
+}
+
+.latency-item:hover, .streaming-item:hover {
+  background: var(--bg-hover, #e2e8f0);
+}
+
+.latency-label, .streaming-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.latency-value, .streaming-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+</style>

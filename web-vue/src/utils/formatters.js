@@ -1,17 +1,31 @@
 // Formatting utilities
 
-export function formatNumber(n) {
-  if (n === undefined || n === null) return '-'
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K'
+/**
+ * Format a number for display with configurable options.
+ * @param {number} n - Number to format
+ * @param {object} options - Formatting options
+ * @param {number} options.decimalsM - Decimals for millions (default: 1)
+ * @param {number} options.decimalsK - Decimals for thousands (default: 1)
+ * @param {string} options.defaultValue - Default value for null/undefined (default: '-')
+ * @returns {string} Formatted number
+ */
+export function formatNumber(n, options = {}) {
+  if (n === undefined || n === null) return options.defaultValue || '-'
+  const decimalsM = options.decimalsM ?? 1
+  const decimalsK = options.decimalsK ?? 1
+
+  if (n >= 1000000) return (n / 1000000).toFixed(decimalsM) + 'M'
+  if (n >= 1000) return (n / 1000).toFixed(decimalsK) + 'K'
   return n.toLocaleString()
 }
 
+/**
+ * Format tokens (alias for formatNumber with token defaults).
+ * @param {number} n - Token count
+ * @returns {string} Formatted token count
+ */
 export function formatTokens(n) {
-  if (n === undefined || n === null) return '0'
-  if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M'
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K'
-  return n.toLocaleString()
+  return formatNumber(n, { decimalsM: 2, decimalsK: 1, defaultValue: '0' })
 }
 
 export function formatCost(c) {
@@ -22,29 +36,45 @@ export function formatCost(c) {
   return '$' + num.toFixed(4)
 }
 
-export function formatDateTime(d) {
+/**
+ * Format a datetime with configurable precision.
+ * @param {string|Date} d - Date to format
+ * @param {object} options - Formatting options
+ * @param {boolean} options.includeSeconds - Include seconds (default: false)
+ * @param {boolean} options.includeMilliseconds - Include milliseconds (default: false)
+ * @returns {string} Formatted date
+ */
+export function formatDateTime(d, options = {}) {
   if (!d) return '-'
+  const { includeSeconds = false, includeMilliseconds = false } = options
   const date = new Date(d)
-  return date.toLocaleString('en-US', {
+
+  const parts = {
     month: 'short',
     day: 'numeric',
     year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
     hour: '2-digit',
     minute: '2-digit'
-  })
+  }
+
+  if (includeSeconds) parts.second = '2-digit'
+
+  let result = date.toLocaleString('en-US', parts)
+
+  if (includeMilliseconds) {
+    result += '.' + date.getMilliseconds().toString().padStart(3, '0')
+  }
+
+  return result
 }
 
+/**
+ * Format a datetime with full precision (seconds + milliseconds).
+ * @param {string|Date} d - Date to format
+ * @returns {string} Formatted date with seconds and milliseconds
+ */
 export function formatDateTimeDetailed(d) {
-  if (!d) return '-'
-  const date = new Date(d)
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  }) + '.' + date.getMilliseconds().toString().padStart(3, '0')
+  return formatDateTime(d, { includeSeconds: true, includeMilliseconds: true })
 }
 
 export function formatShortDate(d) {

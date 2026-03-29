@@ -152,8 +152,8 @@ class AnthropicCaptureAddon:
                     interaction.cache_read_tokens = parsed_response.cache_read_tokens
                     interaction.calculate_cost()
 
-                # Store the interaction
-                self._store_interaction(interaction)
+                # Store the interaction with timing info and streaming metrics
+                self._store_interaction(interaction, flow, parsed_response)
 
                 logger.info(
                     f"Captured streaming request: {interaction.request_id}, "
@@ -169,8 +169,8 @@ class AnthropicCaptureAddon:
                     response_body=flow.response.content,
                 )
 
-                # Store the interaction
-                self._store_interaction(interaction)
+                # Store the interaction with timing info (no streaming metrics for non-streaming)
+                self._store_interaction(interaction, flow, None)
 
                 logger.info(
                     f"Captured request: {interaction.request_id}, "
@@ -241,8 +241,8 @@ class AnthropicCaptureAddon:
             else:
                 interaction.response_body = f"[ERROR: {flow.error}]"
 
-            # Store the interaction
-            self._store_interaction(interaction)
+            # Store the interaction with flow for timing info (no streaming on error)
+            self._store_interaction(interaction, flow, None)
 
             logger.info(
                 f"Captured request (with error): {interaction.request_id}, "
@@ -282,6 +282,69 @@ class AnthropicCaptureAddon:
 
         return False
 
+    def _extract_timing_info(self, flow: http.HTTPFlow) -> Dict[str, int]:
+        """
+        Extract detailed timing from HTTP flow.
+
+        Uses mitmproxy's built-in timestamps to calculate phase timings.
+        """
+        timing = {}
+
+        # Server connection timing (TCP connect)
+        if (flow.server_conn.timestamp_start and flow.server_conn.timestamp_tcp_setup):
+            timing['connect_ms'] = int(
+                (flow.server_conn.timestamp_tcp_setup - flow.server_conn.timestamp_start) * 1000
+            )
+
+        # TLS handshake timing
+        if (flow.server_conn.timestamp_tcp_setup and flow.server_conn.timestamp_tls_setup):
+            timing['tls_ms'] = int(
+                (flow.server_conn.timestamp_tls_setup - flow.server_conn.timestamp_tcp_setup) * 1000
+            )
+
+        # Request timing - time to send the request
+        if flow.request.timestamp_start and flow.request.timestamp_end:
+            timing['send_ms'] = int(
+                (flow.request.timestamp_end - flow.request.timestamp_start) * 1000
+            )
+
+        # Time to first byte (server processing + network latency)
+        if (flow.response and flow.request.timestamp_end and flow.response.timestamp_start):
+            timing['wait_ms'] = int(
+                (flow.response.timestamp_start - flow.request.timestamp_end) * 1000
+            )
+
+        # Response receive time
+        if flow.response and flow.response.timestamp_start and flow.response.timestamp_end:
+            timing['receive_ms'] = int(
+                (flow.response.timestamp_end - flow.response.timestamp_start) * 1000
+            )
+
+        return timing
+
+    def _calc_time_to_first_token(self, wait_ms: Optional[int], parsed_response) -> Optional[int]:
+        """Calculate time to first token (wait time + first token generation)."""
+        if not parsed_response or not parsed_response.first_token_time:
+            return None
+        # Time to first token = wait_ms (time to first byte) + any additional time
+        # For simplicity, we estimate based on first token arrival
+        return wait_ms if wait_ms else 0
+
+    def _calc_time_to_last_token(self, wait_ms: Optional[int], parsed_response) -> Optional[int]:
+        """Calculate time to last token."""
+        if not parsed_response or not parsed_response.first_token_time or not parsed_response.last_token_time:
+            return None
+        # Total generation time from first to last token
+        return parsed_response.total_generation_ms
+
+    def _calc_avg_token_latency(self, parsed_response) -> Optional[int]:
+        """Calculate average time between tokens."""
+        if not parsed_response or parsed_response.token_count < 2:
+            return None
+        # Average time per token = total generation time / (token count - 1)
+        # (subtract 1 because latency is between tokens)
+        return parsed_response.total_generation_ms // (parsed_response.token_count - 1)
+
     def _update_session(self, parsed_request) -> None:
         """Update or create a session."""
         session_id = parsed_request.session_id
@@ -313,7 +376,7 @@ class AnthropicCaptureAddon:
             session = self.state.active_sessions[session_id]
             session.model = parsed_request.model
 
-    def _store_interaction(self, interaction: APIInteraction) -> None:
+    def _store_interaction(self, interaction: APIInteraction, flow: http.HTTPFlow = None, parsed_response=None) -> None:
         """Store an API interaction in the database."""
         if not self.db:
             logger.warning("Database not initialized")
@@ -346,6 +409,18 @@ class AnthropicCaptureAddon:
             response_text = interaction.parsed_response.text_content
             response_thinking = interaction.parsed_response.thinking_content
 
+        # Extract timing info from flow
+        timing = self._extract_timing_info(flow) if flow else {}
+
+        # Deduplicate system-reminder content
+        try:
+            body_dict = json.loads(interaction.request_body) if interaction.request_body else {}
+            processed_body = AnthropicHandler.deduplicate_request_body(body_dict, self.db)
+            request_body_to_store = json.dumps(processed_body)
+        except (json.JSONDecodeError, Exception) as e:
+            logger.warning(f"Failed to deduplicate system-reminder: {e}")
+            request_body_to_store = interaction.request_body
+
         # Create request record (without streaming response body to save space)
         request = Request(
             request_id=interaction.request_id,
@@ -364,10 +439,20 @@ class AnthropicCaptureAddon:
             cache_creation_tokens=interaction.cache_creation_tokens,
             cache_read_tokens=interaction.cache_read_tokens,
             cost=interaction.cost,
-            request_body=interaction.request_body,
+            request_body=request_body_to_store,
             response_body="",  # Skip streaming response body to save space
             response_text=response_text,
             response_thinking=response_thinking,
+            # Timing fields
+            connect_ms=timing.get('connect_ms'),
+            tls_ms=timing.get('tls_ms'),
+            send_ms=timing.get('send_ms'),
+            wait_ms=timing.get('wait_ms'),
+            receive_ms=timing.get('receive_ms'),
+            # Streaming timing fields
+            time_to_first_token_ms=self._calc_time_to_first_token(timing.get('wait_ms'), parsed_response),
+            time_to_last_token_ms=self._calc_time_to_last_token(timing.get('wait_ms'), parsed_response),
+            avg_token_latency_ms=self._calc_avg_token_latency(parsed_response),
         )
 
         self.db.save_request(request)

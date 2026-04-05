@@ -80,6 +80,8 @@ CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at);
 CREATE INDEX IF NOT EXISTS idx_requests_session ON requests(session_id);
 CREATE INDEX IF NOT EXISTS idx_requests_timestamp ON requests(timestamp);
 CREATE INDEX IF NOT EXISTS idx_requests_model ON requests(model);
+CREATE INDEX IF NOT EXISTS idx_requests_session_timestamp ON requests(session_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_requests_model_timestamp ON requests(model, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_request ON tool_calls(request_id);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_name ON tool_calls(tool_name);
 CREATE INDEX IF NOT EXISTS idx_messages_request ON messages(request_id);

@@ -862,3 +862,39 @@ class Database:
                     "other": breakdown.get('other', 0)
                 }
             }
+
+    def _get_aggregated_stats(self, period_type: str, period_start: datetime) -> Optional[Statistics]:
+        """
+        Get pre-aggregated statistics for a specific period.
+
+        Args:
+            period_type: 'hour' or 'day'
+            period_start: Start of the period
+
+        Returns:
+            Statistics record or None
+        """
+        with self.db_session() as db:
+            return db.query(Statistics).filter_by(
+                period_type=period_type,
+                period_start=period_start
+            ).first()
+
+    def get_aggregated_stats_range(self, period_type: str, start: datetime, end: datetime) -> List[Statistics]:
+        """
+        Get pre-aggregated statistics for a range of periods.
+
+        Args:
+            period_type: 'hour' or 'day'
+            start: Start of the range
+            end: End of the range
+
+        Returns:
+            List of Statistics records
+        """
+        with self.db_session() as db:
+            return db.query(Statistics).filter(
+                Statistics.period_type == period_type,
+                Statistics.period_start >= start,
+                Statistics.period_start < end
+            ).order_by(Statistics.period_start).all()

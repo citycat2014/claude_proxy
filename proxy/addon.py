@@ -17,8 +17,10 @@ from mitmproxy.http import Headers
 
 from config.settings import TARGET_DOMAINS, DATABASE_PATH
 from proxy.anthropic_handler import AnthropicHandler, APIInteraction
+from proxy.filter_engine import URLFilterEngine
 from storage.database import Database
 from storage.models import Session, Request, ToolCall, Message
+from storage.worker import init_worker, enqueue_write, shutdown_worker
 
 # Configure logging
 logging.basicConfig(
@@ -48,6 +50,7 @@ class AnthropicCaptureAddon:
         self.state = CaptureState()
         self.handler = AnthropicHandler()
         self.db: Optional[Database] = None
+        self.filter_engine: Optional[URLFilterEngine] = None
 
     def load(self, loader):
         """Called when the addon is loaded."""
@@ -56,6 +59,14 @@ class AnthropicCaptureAddon:
         # Initialize database
         self.db = Database(DATABASE_PATH)
         logger.info(f"Database initialized at {DATABASE_PATH}")
+
+        # Initialize URL filter engine
+        self.filter_engine = URLFilterEngine(self.db)
+        logger.info("URL filter engine initialized")
+
+        # Initialize background write worker
+        init_worker(self.db, batch_size=10, batch_interval=0.1)
+        logger.info("Background write worker initialized")
 
     def request(self, flow: http.HTTPFlow) -> None:
         """
@@ -67,41 +78,48 @@ class AnthropicCaptureAddon:
         host = flow.request.pretty_host.lower()
         path = flow.request.path
         method = flow.request.method
+        url = f"{flow.request.scheme}://{host}{path}"
 
         # Log all HTTPS requests for debugging
         if flow.request.scheme == "https":
-            logger.info(f"[REQUEST] {method} https://{host}{path}")
+            logger.info(f"[REQUEST] {method} {url}")
 
-        # Capture ALL POST requests to messages-like endpoints
+        # Check if URL should be captured based on filter rules
+        if not self.filter_engine or not self.filter_engine.should_capture(url):
+            return
+
+        # Only capture POST requests to messages-like endpoints
         is_messages_api = "/v1/messages" in path or "/messages" in path
         is_post = method == "POST"
 
-        # Check if this looks like an API request
-        if is_post and is_messages_api:
-            flow.metadata["is_tracked"] = True
-            flow.metadata["start_time"] = datetime.now()
+        if not (is_post and is_messages_api):
+            return
 
-            # Parse request
-            try:
-                body_content = flow.request.content
-                logger.info(f"Request body size: {len(body_content)} bytes")
+        # Mark as tracked and capture
+        flow.metadata["is_tracked"] = True
+        flow.metadata["start_time"] = datetime.now()
 
-                parsed = self.handler.parse_request(
-                    method=flow.request.method,
-                    endpoint=flow.request.path,
-                    headers=dict(flow.request.headers),
-                    body=body_content,
-                )
+        # Parse request
+        try:
+            body_content = flow.request.content
+            logger.info(f"Request body size: {len(body_content)} bytes")
 
-                if parsed:
-                    flow.metadata["parsed_request"] = parsed
-                    logger.info(f"Parsed request: {parsed.request_id} to model={parsed.model}")
+            parsed = self.handler.parse_request(
+                method=flow.request.method,
+                endpoint=flow.request.path,
+                headers=dict(flow.request.headers),
+                body=body_content,
+            )
 
-                    # Track session
-                    self._update_session(parsed)
+            if parsed:
+                flow.metadata["parsed_request"] = parsed
+                logger.info(f"Parsed request: {parsed.request_id} to model={parsed.model}")
 
-            except Exception as e:
-                logger.error(f"Error parsing request: {e}")
+                # Track session
+                self._update_session(parsed)
+
+        except Exception as e:
+            logger.error(f"Error parsing request: {e}")
 
     def response(self, flow: http.HTTPFlow) -> None:
         """
@@ -455,18 +473,19 @@ class AnthropicCaptureAddon:
             avg_token_latency_ms=self._calc_avg_token_latency(parsed_response),
         )
 
-        self.db.save_request(request)
+        # Enqueue request for async write (instead of synchronous)
+        enqueue_write((request, tool_calls))
 
-        # Store tool calls if present
-        if interaction.parsed_response:
-            tool_uses = interaction.parsed_response.get_tool_uses()
-            for tool_use in tool_uses:
-                tool_call = ToolCall(
-                    request_id=interaction.request_id,
-                    tool_name=tool_use.get("name", ""),
-                    tool_input_json=json.dumps(tool_use.get("input", {})),
-                )
-                self.db.save_tool_call(tool_call)
+        logger.debug(f"Enqueued request for writing: {interaction.request_id}")
+
+    def done(self):
+        """Called when the proxy is shutting down."""
+        logger.info("Shutting down AnthropicCaptureAddon...")
+
+        # Shutdown write worker and flush pending items
+        shutdown_worker(timeout=10.0)
+
+        logger.info("AnthropicCaptureAddon shutdown complete")
 
 
 # Export addon for mitmproxy

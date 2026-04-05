@@ -118,6 +118,8 @@ class Request(Base):
     __table_args__ = (
         Index('idx_requests_session', 'session_id'),
         Index('idx_requests_timestamp', 'timestamp'),
+        Index('idx_requests_session_timestamp', 'session_id', 'timestamp'),
+        Index('idx_requests_model_timestamp', 'model', 'timestamp'),
     )
 
     def get_messages(self) -> List[Dict[str, Any]]:
@@ -257,6 +259,39 @@ class Statistics(Base):
             "total_output_tokens": self.total_output_tokens,
             "total_cost": self.total_cost,
             "avg_response_time_ms": self.avg_response_time_ms,
+        }
+
+
+class UrlFilter(Base):
+    """URL filter rule for capturing requests."""
+    __tablename__ = 'url_filters'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    pattern = Column(String(500), nullable=False)
+    filter_type = Column(String(20), default='domain')  # domain, path, regex, exact, wildcard
+    action = Column(String(10), default='include')  # include, exclude
+    priority = Column(Integer, default=100)
+    is_enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    __table_args__ = (
+        Index('idx_url_filters_enabled', 'is_enabled'),
+        Index('idx_url_filters_priority', 'priority'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "pattern": self.pattern,
+            "filter_type": self.filter_type,
+            "action": self.action,
+            "priority": self.priority,
+            "is_enabled": self.is_enabled,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
 

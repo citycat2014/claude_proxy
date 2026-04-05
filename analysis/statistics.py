@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 
+from analysis.aggregator import StatisticsAggregator
+
 
 @dataclass
 class SummaryStats:
@@ -32,8 +34,43 @@ class StatisticsEngine:
 
     def get_summary(self, hours: Optional[int] = None, models: Optional[List[str]] = None) -> SummaryStats:
         """Get overall summary statistics with optional time and model filter."""
-        stats = self.db.get_statistics_summary(hours=hours, models=models)
-        today_stats = self.db.get_today_stats(models=models)
+        # Try to use pre-aggregated statistics first for better performance
+        # Only fall back to full table scan if models filter is applied or time range is small
+
+        if models:
+            # Model-specific filtering requires querying raw data
+            stats = self.db.get_statistics_summary(hours=hours, models=models)
+            today_stats = self.db.get_today_stats(models=models)
+        elif hours and hours < 24:
+            # For short time ranges, query raw data directly (more accurate)
+            stats = self.db.get_statistics_summary(hours=hours, models=None)
+            today_stats = self.db.get_today_stats(models=None)
+        else:
+            # For longer ranges, try to use pre-aggregated data
+            # Use the latest aggregated statistics
+            aggregator = StatisticsAggregator(self.db)
+
+            # Try to get today's aggregated stats
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_agg = self.db._get_aggregated_stats('day', today)
+
+            if today_agg:
+                # Use pre-aggregated data
+                stats = {
+                    'total_requests': today_agg.request_count,
+                    'total_input_tokens': today_agg.total_input_tokens,
+                    'total_output_tokens': today_agg.total_output_tokens,
+                    'total_cost': today_agg.total_cost,
+                    'avg_response_time_ms': today_agg.avg_response_time_ms or 0,
+                    'cache_creation_tokens': 0,  # Not tracked in aggregated stats
+                    'cache_read_tokens': 0,
+                    'total_sessions': 0,  # Not tracked in aggregated stats
+                }
+            else:
+                # Fall back to raw query
+                stats = self.db.get_statistics_summary(hours=hours, models=None)
+
+            today_stats = self.db.get_today_stats(models=None)
 
         return SummaryStats(
             total_requests=stats.get("total_requests", 0),

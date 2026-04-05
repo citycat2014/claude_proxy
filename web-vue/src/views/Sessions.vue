@@ -45,6 +45,17 @@
           <label style="display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">To Date</label>
           <input v-model="filters.dateTo" type="date" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary);" />
         </div>
+        <div class="filter-group" style="flex: 0; min-width: auto;">
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; cursor: pointer;">
+            <input
+              v-model="filters.failedOnly"
+              @change="applyFilters"
+              type="checkbox"
+              style="width: 16px; height: 16px; cursor: pointer;"
+            />
+            Failed Only
+          </label>
+        </div>
         <div class="filter-actions" style="display: flex; gap: 8px;">
           <button @click="applyFilters" class="btn btn-primary" style="padding: 8px 16px;">
             <i class="bi bi-search"></i> Search
@@ -57,9 +68,12 @@
     </div>
 
     <!-- Results Info -->
-    <div v-if="store.hasFilters" style="margin-bottom: 12px; padding: 8px 12px; background: var(--bg-secondary); border-radius: var(--radius); display: flex; align-items: center; gap: 8px;">
+    <div v-if="store.hasFilters" style="margin-bottom: 12px; padding: 8px 12px; background: var(--bg-secondary); border-radius: var(--radius); display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
       <span style="color: var(--text-secondary); font-size: 13px;">
         Found {{ store.total }} session{{ store.total !== 1 ? 's' : '' }}
+      </span>
+      <span v-if="filters.failedOnly" style="color: var(--danger); font-size: 12px; font-weight: 500;">
+        <i class="bi bi-exclamation-circle"></i> Failed requests only
       </span>
       <button @click="clearFilters" style="background: none; border: none; color: var(--primary); font-size: 13px; cursor: pointer; text-decoration: underline;">
         Clear filters
@@ -169,7 +183,8 @@ const filters = ref({
   requestId: '',
   model: '',
   dateFrom: '',
-  dateTo: ''
+  dateTo: '',
+  failedOnly: false
 })
 
 const displayedPages = computed(() => {
@@ -193,7 +208,8 @@ function applyFilters() {
     requestId: filters.value.requestId,
     model: filters.value.model,
     dateFrom: filters.value.dateFrom,
-    dateTo: filters.value.dateTo
+    dateTo: filters.value.dateTo,
+    failedOnly: filters.value.failedOnly
   })
 }
 
@@ -203,7 +219,8 @@ function clearFilters() {
     requestId: '',
     model: '',
     dateFrom: '',
-    dateTo: ''
+    dateTo: '',
+    failedOnly: false
   }
   store.clearFilters()
 }

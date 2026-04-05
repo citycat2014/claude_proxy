@@ -299,6 +299,7 @@ def api_sessions():
     model = request.args.get("model", None)
     date_from = request.args.get("date_from", None)
     date_to = request.args.get("date_to", None)
+    failed_only = request.args.get("failed_only", None)
 
     sessions, total = db.get_sessions(
         limit=per_page, offset=(page - 1) * per_page,
@@ -306,7 +307,8 @@ def api_sessions():
         request_id_filter=request_id,
         model_filter=model,
         date_from=date_from,
-        date_to=date_to
+        date_to=date_to,
+        failed_only=(failed_only == "true")
     )
 
     return jsonify({

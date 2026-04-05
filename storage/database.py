@@ -77,9 +77,15 @@ class Database:
         model_filter: str = None,
         date_from: str = None,
         date_to: str = None,
-        request_id_filter: str = None
+        request_id_filter: str = None,
+        failed_only: bool = False
     ) -> tuple[List[Session], int]:
-        """Get sessions list with filtering, ordered by most recent request time."""
+        """Get sessions list with filtering, ordered by most recent request time.
+
+        Args:
+            failed_only: If True, only return sessions that have at least one failed request
+                        (response_status not in 200-299 range)
+        """
         with self.db_session() as db:
             # Subquery to get latest request timestamp for each session
             latest_request_subq = db.query(
@@ -107,6 +113,16 @@ class Database:
                 query = query.filter(Session.started_at >= date_from)
             if date_to:
                 query = query.filter(Session.started_at <= date_to)
+            if failed_only:
+                # Filter to sessions that have at least one failed request
+                query = query.join(Request, Session.session_id == Request.session_id)
+                query = query.filter(
+                    or_(
+                        Request.response_status < 200,
+                        Request.response_status >= 300
+                    )
+                )
+                query = query.distinct()
 
             # Get total count (need to handle the join properly for count)
             count_query = db.query(func.count(func.distinct(Session.id)))
@@ -121,6 +137,15 @@ class Database:
                 count_query = count_query.filter(Session.started_at >= date_from)
             if date_to:
                 count_query = count_query.filter(Session.started_at <= date_to)
+            if failed_only:
+                count_query = count_query.join(Request, Session.session_id == Request.session_id)
+                count_query = count_query.filter(
+                    or_(
+                        Request.response_status < 200,
+                        Request.response_status >= 300
+                    )
+                )
+                count_query = count_query.distinct()
             total = count_query.scalar()
 
             # Apply pagination and ordering - by latest request time, then by session end/start time

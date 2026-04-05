@@ -14,7 +14,8 @@ export const useSessionsStore = defineStore('sessions', {
       requestId: '',
       model: '',
       dateFrom: '',
-      dateTo: ''
+      dateTo: '',
+      failedOnly: false
     },
     currentSession: null,
     sessionRequests: [],
@@ -24,7 +25,7 @@ export const useSessionsStore = defineStore('sessions', {
   getters: {
     hasFilters: (state) => {
       return state.filters.sessionId || state.filters.requestId || state.filters.model ||
-             state.filters.dateFrom || state.filters.dateTo
+             state.filters.dateFrom || state.filters.dateTo || state.filters.failedOnly
     }
   },
 
@@ -45,6 +46,7 @@ export const useSessionsStore = defineStore('sessions', {
         if (this.filters.model) params.append('model', this.filters.model)
         if (this.filters.dateFrom) params.append('date_from', this.filters.dateFrom)
         if (this.filters.dateTo) params.append('date_to', this.filters.dateTo)
+        if (this.filters.failedOnly) params.append('failed_only', 'true')
 
         const response = await fetch(`/api/sessions?${params.toString()}`)
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -97,8 +99,14 @@ export const useSessionsStore = defineStore('sessions', {
         requestId: '',
         model: '',
         dateFrom: '',
-        dateTo: ''
+        dateTo: '',
+        failedOnly: false
       }
+      this.fetchSessions(1)
+    },
+
+    toggleFailedOnly() {
+      this.filters.failedOnly = !this.filters.failedOnly
       this.fetchSessions(1)
     }
   }

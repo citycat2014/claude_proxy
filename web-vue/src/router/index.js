@@ -5,6 +5,7 @@ import SessionDetail from '@/views/SessionDetail.vue'
 import RequestDetail from '@/views/RequestDetail.vue'
 import Analysis from '@/views/Analysis.vue'
 import Settings from '@/views/Settings.vue'
+import RecycleBin from '@/views/RecycleBin.vue'
 
 const routes = [
   {
@@ -38,6 +39,12 @@ const routes = [
     name: 'Analysis',
     component: Analysis,
     meta: { title: 'Analysis' }
+  },
+  {
+    path: '/recycle-bin',
+    name: 'RecycleBin',
+    component: RecycleBin,
+    meta: { title: 'Recycle Bin' }
   },
   {
     path: '/settings',

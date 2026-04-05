@@ -688,6 +688,258 @@ def api_cleanup_vacuum():
 
 
 # ============================================================================
+# Recycle Bin API
+# ============================================================================
+
+@app.route("/api/recycle-bin", methods=["GET"])
+def api_recycle_bin_list():
+    """Get recycle bin entries with pagination."""
+    try:
+        from storage.recycle_bin import RecycleBinManager
+
+        manager = RecycleBinManager(db)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        table_filter = request.args.get('table')
+
+        entries, total = manager.get_recycle_bin_entries(
+            table_filter=table_filter,
+            limit=per_page,
+            offset=(page - 1) * per_page
+        )
+
+        return jsonify({
+            'entries': [e.to_dict() for e in entries],
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page,
+        })
+    except Exception as e:
+        logger.error(f"Error getting recycle bin: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/recycle-bin/stats", methods=["GET"])
+def api_recycle_bin_stats():
+    """Get recycle bin statistics."""
+    try:
+        from storage.recycle_bin import RecycleBinManager
+
+        manager = RecycleBinManager(db)
+        stats = manager.get_recycle_bin_stats()
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error getting recycle bin stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/recycle-bin/<int:entry_id>", methods=["DELETE"])
+def api_recycle_bin_delete(entry_id):
+    """Permanently delete a recycle bin entry."""
+    try:
+        from storage.recycle_bin import RecycleBinManager, CleanupLogManager
+
+        manager = RecycleBinManager(db)
+        success = manager.permanent_delete(entry_id)
+
+        if success:
+            # Log the purge
+            log_manager = CleanupLogManager(db)
+            log = log_manager.start_cleanup_log('recycle_bin_purge')
+            log_manager.complete_cleanup_log(
+                log_id=log.id,
+                records_processed=1,
+                records_by_table={'recycle_bin': 1},
+                details={'deleted_entry_id': entry_id}
+            )
+            return jsonify({'success': True, 'deleted': entry_id})
+        else:
+            return jsonify({'success': False, 'error': 'Entry not found'}), 404
+    except Exception as e:
+        logger.error(f"Error deleting recycle bin entry: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/recycle-bin", methods=["DELETE"])
+def api_recycle_bin_clear():
+    """Clear all recycle bin entries."""
+    try:
+        from storage.recycle_bin import RecycleBinManager, CleanupLogManager
+
+        manager = RecycleBinManager(db)
+
+        # Get stats before clearing
+        stats = manager.get_recycle_bin_stats()
+        total_entries = stats['total_entries']
+
+        if total_entries == 0:
+            return jsonify({'success': True, 'deleted': 0, 'message': 'Recycle bin is empty'})
+
+        # Clear the recycle bin
+        deleted = manager.clear_recycle_bin()
+
+        # Log the purge
+        log_manager = CleanupLogManager(db)
+        log = log_manager.start_cleanup_log('recycle_bin_purge')
+        log_manager.complete_cleanup_log(
+            log_id=log.id,
+            records_processed=deleted,
+            records_by_table={'recycle_bin': deleted},
+            space_reclaimed_bytes=stats.get('total_size_bytes', 0),
+            details={'cleared_all': True, 'previous_total': total_entries}
+        )
+
+        return jsonify({
+            'success': True,
+            'deleted': deleted,
+            'space_reclaimed_mb': stats.get('total_size_mb', 0)
+        })
+    except Exception as e:
+        logger.error(f"Error clearing recycle bin: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/recycle-bin/auto-expire", methods=["POST"])
+def api_recycle_bin_auto_expire():
+    """Trigger auto-expiration of old recycle bin entries."""
+    try:
+        from storage.recycle_bin import RecycleBinManager
+
+        manager = RecycleBinManager(db)
+        expired = manager.auto_expire_old_entries()
+
+        return jsonify({'success': True, 'expired': expired})
+    except Exception as e:
+        logger.error(f"Error auto-expiring recycle bin: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# Cleanup Log API
+# ============================================================================
+
+@app.route("/api/cleanup/logs", methods=["GET"])
+def api_cleanup_logs():
+    """Get cleanup operation logs."""
+    try:
+        from storage.recycle_bin import CleanupLogManager
+
+        manager = CleanupLogManager(db)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        cleanup_type = request.args.get('type')
+
+        logs, total = manager.get_cleanup_logs(
+            cleanup_type=cleanup_type,
+            limit=per_page,
+            offset=(page - 1) * per_page
+        )
+
+        return jsonify({
+            'logs': [log.to_dict() for log in logs],
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page,
+        })
+    except Exception as e:
+        logger.error(f"Error getting cleanup logs: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cleanup/stats", methods=["GET"])
+def api_cleanup_stats():
+    """Get overall cleanup statistics."""
+    try:
+        from storage.recycle_bin import CleanupLogManager
+
+        manager = CleanupLogManager(db)
+        stats = manager.get_cleanup_stats()
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error getting cleanup stats: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# Settings API
+# ============================================================================
+
+@app.route("/api/settings", methods=["GET"])
+def api_settings_list():
+    """Get all system settings."""
+    try:
+        from storage.recycle_bin import SettingsManager
+
+        manager = SettingsManager(db)
+        settings = manager.get_all_settings()
+        return jsonify({
+            'settings': [s.to_dict() for s in settings]
+        })
+    except Exception as e:
+        logger.error(f"Error getting settings: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/settings/<key>", methods=["GET"])
+def api_settings_get(key):
+    """Get a single setting."""
+    try:
+        from storage.recycle_bin import SettingsManager
+
+        manager = SettingsManager(db)
+        value = manager.get_setting(key)
+
+        if value is not None:
+            return jsonify({'key': key, 'value': value})
+        else:
+            return jsonify({'error': 'Setting not found'}), 404
+    except Exception as e:
+        logger.error(f"Error getting setting: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/settings/<key>", methods=["PUT"])
+def api_settings_update(key):
+    """Update a system setting."""
+    try:
+        from storage.recycle_bin import SettingsManager
+
+        manager = SettingsManager(db)
+        data = request.get_json() or {}
+        value = data.get('value')
+        value_type = data.get('type')  # Optional
+
+        if value is None:
+            return jsonify({'error': 'value is required'}), 400
+
+        success = manager.set_setting(key, value, value_type)
+
+        if success:
+            return jsonify({'success': True, 'key': key, 'value': value})
+        else:
+            return jsonify({'error': 'Failed to update setting'}), 500
+    except Exception as e:
+        logger.error(f"Error updating setting: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/settings/cleanup", methods=["GET"])
+def api_settings_cleanup():
+    """Get cleanup-related settings."""
+    try:
+        from storage.recycle_bin import SettingsManager
+
+        manager = SettingsManager(db)
+        settings = manager.get_cleanup_settings()
+        return jsonify(settings)
+    except Exception as e:
+        logger.error(f"Error getting cleanup settings: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
 # Main
 # ============================================================================
 

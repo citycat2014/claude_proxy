@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import func, text
 from storage.database import Database
 from storage.models import Request, ToolCall, Message, SystemReminder, Session
+from storage.recycle_bin import RecycleBinManager, CleanupLogManager
 from config.settings import (
     DATA_RETENTION_DAYS,
     DATA_CLEANUP_ENABLED,
@@ -86,7 +87,15 @@ class DataCleanupManager:
         ],
     }
 
-    def __init__(self, db: Database, retention_days: int = None, batch_size: int = None):
+    def __init__(
+        self,
+        db: Database,
+        retention_days: int = None,
+        batch_size: int = None,
+        recycle_bin: RecycleBinManager = None,
+        log_manager: CleanupLogManager = None,
+        use_recycle_bin: bool = True
+    ):
         """
         Initialize the cleanup manager.
 
@@ -94,10 +103,16 @@ class DataCleanupManager:
             db: Database instance
             retention_days: Days to retain full data (default from settings)
             batch_size: Records to process per batch (default from settings)
+            recycle_bin: RecycleBinManager for moving data to recycle bin
+            log_manager: CleanupLogManager for logging operations
+            use_recycle_bin: Whether to use recycle bin (True) or clear fields directly (False)
         """
         self.db = db
         self.retention_days = retention_days or DATA_RETENTION_DAYS
         self.batch_size = batch_size or DATA_CLEANUP_BATCH_SIZE
+        self.recycle_bin = recycle_bin
+        self.log_manager = log_manager
+        self.use_recycle_bin = use_recycle_bin
         self._stats = {
             'last_cleanup_time': None,
             'total_records_cleaned': 0,
@@ -166,13 +181,19 @@ class DataCleanupManager:
             logger.warning(f"Failed to estimate space usage: {e}")
             return {'total_mb': 0, 'breakdown': {}}
 
-    def cleanup_old_data(self, days: int = None, dry_run: bool = False) -> Dict[str, Any]:
+    def cleanup_old_data(
+        self,
+        days: int = None,
+        dry_run: bool = False,
+        cleanup_type: str = 'manual'
+    ) -> Dict[str, Any]:
         """
-        Clean up old data by clearing content fields.
+        Clean up old data by clearing content fields or moving to recycle bin.
 
         Args:
             days: Days threshold for old data (default: retention_days)
             dry_run: If True, only return stats without actually cleaning
+            cleanup_type: 'auto' or 'manual' for logging
 
         Returns:
             Dict with cleanup results
@@ -187,20 +208,28 @@ class DataCleanupManager:
             logger.info(f"[DRY RUN] Would clean {stats['records_awaiting_cleanup']} records")
             return {'dry_run': True, **stats}
 
+        # Start cleanup log
+        log_entry = None
+        if self.log_manager:
+            log_entry = self.log_manager.start_cleanup_log(cleanup_type, days)
+
         results = {
             'cutoff_date': cutoff.isoformat(),
             'requests_cleaned': 0,
             'tool_calls_cleaned': 0,
             'messages_cleaned': 0,
+            'recycle_bin_entries': 0,
+            'space_reclaimed_bytes': 0,
             'errors': [],
         }
 
         # Clean requests
         try:
-            req_count = self._cleanup_table(
-                Request, 'requests', 'timestamp', cutoff
+            req_count, req_space = self._cleanup_table(
+                Request, 'requests', 'timestamp', cutoff, cleanup_type
             )
             results['requests_cleaned'] = req_count
+            results['space_reclaimed_bytes'] += req_space
             logger.info(f"Cleaned {req_count} old requests")
         except Exception as e:
             logger.error(f"Failed to clean requests: {e}")
@@ -208,10 +237,11 @@ class DataCleanupManager:
 
         # Clean tool calls
         try:
-            tool_count = self._cleanup_table(
-                ToolCall, 'tool_calls', 'timestamp', cutoff
+            tool_count, tool_space = self._cleanup_table(
+                ToolCall, 'tool_calls', 'timestamp', cutoff, cleanup_type
             )
             results['tool_calls_cleaned'] = tool_count
+            results['space_reclaimed_bytes'] += tool_space
             logger.info(f"Cleaned {tool_count} old tool calls")
         except Exception as e:
             logger.error(f"Failed to clean tool calls: {e}")
@@ -220,26 +250,52 @@ class DataCleanupManager:
         # Clean messages (if timestamp column exists)
         try:
             if hasattr(Message, 'timestamp'):
-                msg_count = self._cleanup_table(
-                    Message, 'messages', 'timestamp', cutoff
+                msg_count, msg_space = self._cleanup_table(
+                    Message, 'messages', 'timestamp', cutoff, cleanup_type
                 )
                 results['messages_cleaned'] = msg_count
+                results['space_reclaimed_bytes'] += msg_space
                 logger.info(f"Cleaned {msg_count} old messages")
         except Exception as e:
             logger.warning(f"Failed to clean messages: {e}")
 
-        # Update stats
-        self._stats['last_cleanup_time'] = datetime.now()
-        self._stats['total_records_cleaned'] += sum([
+        # Calculate total
+        total_cleaned = sum([
             results['requests_cleaned'],
             results['tool_calls_cleaned'],
             results['messages_cleaned'],
         ])
 
+        # Update stats
+        self._stats['last_cleanup_time'] = datetime.now()
+        self._stats['total_records_cleaned'] += total_cleaned
+
+        # Complete cleanup log
+        if self.log_manager and log_entry:
+            self.log_manager.complete_cleanup_log(
+                log_id=log_entry.id,
+                records_processed=total_cleaned,
+                records_by_table={
+                    'requests': results['requests_cleaned'],
+                    'tool_calls': results['tool_calls_cleaned'],
+                    'messages': results['messages_cleaned'],
+                },
+                space_reclaimed_bytes=results['space_reclaimed_bytes'],
+                recycle_bin_entries=results.get('recycle_bin_entries', 0),
+                details={'errors': results['errors']} if results['errors'] else None
+            )
+
         logger.info(f"Data cleanup completed: {results}")
         return results
 
-    def _cleanup_table(self, model_class, table_name: str, timestamp_col: str, cutoff: datetime) -> int:
+    def _cleanup_table(
+        self,
+        model_class,
+        table_name: str,
+        timestamp_col: str,
+        cutoff: datetime,
+        cleanup_type: str = 'manual'
+    ) -> Tuple[int, int]:
         """
         Clean content fields from a specific table for old records.
 
@@ -248,16 +304,18 @@ class DataCleanupManager:
             table_name: Table name for logging
             timestamp_col: Column name for timestamp filtering
             cutoff: Cutoff datetime
+            cleanup_type: 'auto' or 'manual'
 
         Returns:
-            Number of records cleaned
+            Tuple of (number of records cleaned, space reclaimed in bytes)
         """
         fields_to_clean = self.FIELDS_TO_CLEAN.get(table_name, [])
         if not fields_to_clean:
             logger.warning(f"No fields configured for cleanup in {table_name}")
-            return 0
+            return 0, 0
 
         total_cleaned = 0
+        total_space = 0
 
         with self.db.db_session() as session:
             # Get old record IDs in batches
@@ -280,8 +338,35 @@ class DataCleanupManager:
                 if not records:
                     break
 
-                # Clear content fields
+                # Process each record
                 for record in records:
+                    # Extract content fields
+                    content_data = {}
+                    for field in fields_to_clean:
+                        if hasattr(record, field):
+                            value = getattr(record, field)
+                            if value:
+                                content_data[field] = value
+
+                    # Calculate space
+                    content_size = len(json.dumps(content_data).encode('utf-8'))
+                    total_space += content_size
+
+                    # Move to recycle bin if enabled
+                    if self.use_recycle_bin and self.recycle_bin and content_data:
+                        metadata = {
+                            'request_id': getattr(record, 'request_id', None),
+                            'session_id': getattr(record, 'session_id', None),
+                        }
+                        self.recycle_bin.move_to_recycle_bin(
+                            table_name=table_name,
+                            record_id=record.id,
+                            content_fields=content_data,
+                            metadata=metadata,
+                            cleanup_type=cleanup_type
+                        )
+
+                    # Clear content fields
                     for field in fields_to_clean:
                         if hasattr(record, field):
                             setattr(record, field, '')
@@ -292,7 +377,7 @@ class DataCleanupManager:
                 if len(records) < self.batch_size:
                     break
 
-        return total_cleaned
+        return total_cleaned, total_space
 
     def vacuum_database(self) -> bool:
         """
@@ -328,24 +413,44 @@ class CleanupScheduler:
     def __init__(
         self,
         db: Database,
-        cleanup_manager: DataCleanupManager,
-        interval_hours: int = None
+        cleanup_manager: DataCleanupManager = None,
+        interval_hours: int = None,
+        recycle_bin: RecycleBinManager = None,
+        log_manager: CleanupLogManager = None,
+        settings_manager = None
     ):
         """
         Initialize the cleanup scheduler.
 
         Args:
             db: Database instance
-            cleanup_manager: DataCleanupManager instance
+            cleanup_manager: DataCleanupManager instance (created if None)
             interval_hours: Hours between cleanup runs (default from settings)
+            recycle_bin: RecycleBinManager for moving data to recycle bin
+            log_manager: CleanupLogManager for logging operations
+            settings_manager: SettingsManager for dynamic configuration
         """
         self.db = db
-        self.cleanup = cleanup_manager
         self.interval_hours = interval_hours or DATA_CLEANUP_INTERVAL_HOURS
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._last_cleanup_time: Optional[datetime] = None
         self._running = False
+        self.settings_manager = settings_manager
+
+        # Create managers if not provided
+        if cleanup_manager is None:
+            use_recycle_bin = True
+            if settings_manager:
+                use_recycle_bin = settings_manager.get_setting('recycle_bin_enabled', True)
+            self.cleanup = DataCleanupManager(
+                db,
+                recycle_bin=recycle_bin,
+                log_manager=log_manager,
+                use_recycle_bin=use_recycle_bin
+            )
+        else:
+            self.cleanup = cleanup_manager
 
     def start(self):
         """Start the background cleanup thread."""
@@ -353,7 +458,12 @@ class CleanupScheduler:
             logger.warning("Cleanup scheduler already running")
             return
 
-        if not DATA_CLEANUP_ENABLED:
+        # Check if cleanup is enabled (from settings or env)
+        cleanup_enabled = DATA_CLEANUP_ENABLED
+        if self.settings_manager:
+            cleanup_enabled = self.settings_manager.get_setting('cleanup_enabled', DATA_CLEANUP_ENABLED)
+
+        if not cleanup_enabled:
             logger.info("Data cleanup is disabled in settings")
             return
 
@@ -397,9 +507,14 @@ class CleanupScheduler:
 
     def get_status(self) -> Dict[str, Any]:
         """Get current scheduler status."""
+        # Check if cleanup is enabled
+        cleanup_enabled = DATA_CLEANUP_ENABLED
+        if self.settings_manager:
+            cleanup_enabled = self.settings_manager.get_setting('cleanup_enabled', DATA_CLEANUP_ENABLED)
+
         return {
             'running': self.is_running(),
-            'enabled': DATA_CLEANUP_ENABLED,
+            'enabled': cleanup_enabled,
             'interval_hours': self.interval_hours,
             'last_cleanup_time': self._last_cleanup_time.isoformat() if self._last_cleanup_time else None,
             'next_cleanup_time': self._get_next_cleanup_time().isoformat() if self._get_next_cleanup_time() else None,
@@ -422,9 +537,26 @@ class CleanupScheduler:
 
         while not self._stop_event.is_set():
             try:
+                # Check if cleanup is still enabled (dynamic config)
+                if self.settings_manager:
+                    cleanup_enabled = self.settings_manager.get_setting('cleanup_enabled', True)
+                    if not cleanup_enabled:
+                        logger.debug("Cleanup disabled, skipping this cycle")
+                        # Wait 1 hour and check again
+                        for _ in range(3600):
+                            if self._stop_event.is_set():
+                                return
+                            time.sleep(1)
+                        continue
+
+                    # Update interval from settings
+                    self.interval_hours = self.settings_manager.get_setting(
+                        'cleanup_interval_hours', DATA_CLEANUP_INTERVAL_HOURS
+                    )
+
                 if self._should_run_cleanup():
                     logger.info("Starting scheduled data cleanup")
-                    results = self.cleanup.cleanup_old_data()
+                    results = self.cleanup.cleanup_old_data(cleanup_type='auto')
                     self._last_cleanup_time = datetime.now()
 
                     # Log summary

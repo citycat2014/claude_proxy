@@ -32,6 +32,12 @@
             </router-link>
           </li>
           <li class="nav-item">
+            <router-link to="/recycle-bin" class="nav-link" :class="{ active: currentRoute === 'RecycleBin' }">
+              <i class="bi bi-recycle"></i>
+              Recycle Bin
+            </router-link>
+          </li>
+          <li class="nav-item">
             <router-link to="/settings" class="nav-link" :class="{ active: currentRoute === 'Settings' }">
               <i class="bi bi-gear"></i>
               Settings

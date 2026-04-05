@@ -338,6 +338,120 @@ class SystemReminder(Base):
         }
 
 
+class RecycleBin(Base):
+    """Recycle bin for cleaned data."""
+    __tablename__ = 'recycle_bin'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    original_table = Column(String(50), nullable=False, index=True)
+    original_id = Column(Integer, nullable=False)
+    request_id = Column(String(255), nullable=True, index=True)
+    session_id = Column(String(255), nullable=True)
+
+    content_data = Column(Text, nullable=False)
+    content_size_bytes = Column(Integer, default=0)
+
+    cleaned_at = Column(DateTime, default=datetime.now, index=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+    cleanup_type = Column(String(20), default='auto')
+
+    __table_args__ = (
+        Index('idx_recycle_bin_table', 'original_table'),
+        Index('idx_recycle_bin_expires', 'expires_at'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "original_table": self.original_table,
+            "original_id": self.original_id,
+            "request_id": self.request_id,
+            "session_id": self.session_id,
+            "content_data": json.loads(self.content_data) if self.content_data else None,
+            "content_size_bytes": self.content_size_bytes,
+            "content_size_mb": round(self.content_size_bytes / 1024 / 1024, 2) if self.content_size_bytes else 0,
+            "cleaned_at": self.cleaned_at.isoformat() if self.cleaned_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "cleanup_type": self.cleanup_type,
+        }
+
+
+class CleanupLog(Base):
+    """Cleanup operation log."""
+    __tablename__ = 'cleanup_logs'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cleanup_type = Column(String(20), nullable=False, index=True)
+    started_at = Column(DateTime, default=datetime.now, index=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    records_processed = Column(Integer, default=0)
+    records_by_table = Column(Text, nullable=True)
+    space_reclaimed_bytes = Column(Integer, default=0)
+    recycle_bin_entries = Column(Integer, default=0)
+
+    retention_days = Column(Integer, nullable=True)
+    details = Column(Text, nullable=True)
+
+    __table_args__ = (
+        Index('idx_cleanup_logs_type', 'cleanup_type'),
+        Index('idx_cleanup_logs_started', 'started_at'),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "cleanup_type": self.cleanup_type,
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "records_processed": self.records_processed,
+            "records_by_table": json.loads(self.records_by_table) if self.records_by_table else {},
+            "space_reclaimed_bytes": self.space_reclaimed_bytes,
+            "space_reclaimed_mb": round(self.space_reclaimed_bytes / 1024 / 1024, 2) if self.space_reclaimed_bytes else 0,
+            "recycle_bin_entries": self.recycle_bin_entries,
+            "retention_days": self.retention_days,
+            "details": json.loads(self.details) if self.details else None,
+        }
+
+
+class SystemSetting(Base):
+    """System settings that can be modified at runtime."""
+    __tablename__ = 'system_settings'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String(100), unique=True, nullable=False, index=True)
+    value = Column(Text, nullable=True)
+    value_type = Column(String(20), default='str')
+    description = Column(String(500), nullable=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    __table_args__ = (
+        Index('idx_system_settings_key', 'key'),
+    )
+
+    def get_typed_value(self):
+        """Get value with proper type conversion."""
+        if self.value is None:
+            return None
+        if self.value_type == 'int':
+            return int(self.value)
+        if self.value_type == 'bool':
+            return self.value.lower() == 'true' if isinstance(self.value, str) else bool(self.value)
+        if self.value_type == 'float':
+            return float(self.value)
+        return self.value
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "key": self.key,
+            "value": self.get_typed_value(),
+            "value_type": self.value_type,
+            "description": self.description,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
 # Create engine
 engine = create_engine(f'sqlite:///{DATABASE_PATH}', echo=False)
 

@@ -22,6 +22,7 @@ from storage.database import Database
 from storage.models import Session, Request, ToolCall, Message
 from storage.worker import init_worker, enqueue_write, shutdown_worker
 from storage.cleanup import DataCleanupManager, CleanupScheduler
+from storage.recycle_bin import RecycleBinManager, CleanupLogManager, SettingsManager
 
 # Configure logging
 logging.basicConfig(
@@ -54,6 +55,9 @@ class AnthropicCaptureAddon:
         self.filter_engine: Optional[URLFilterEngine] = None
         self.cleanup_manager: Optional[DataCleanupManager] = None
         self.cleanup_scheduler: Optional[CleanupScheduler] = None
+        self.recycle_bin: Optional[RecycleBinManager] = None
+        self.log_manager: Optional[CleanupLogManager] = None
+        self.settings_manager: Optional[SettingsManager] = None
 
     def load(self, loader):
         """Called when the addon is loaded."""
@@ -63,6 +67,14 @@ class AnthropicCaptureAddon:
         self.db = Database(DATABASE_PATH)
         logger.info(f"Database initialized at {DATABASE_PATH}")
 
+        # Initialize settings manager for dynamic configuration
+        try:
+            self.settings_manager = SettingsManager(self.db)
+            logger.info("Settings manager initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize settings manager: {e}")
+            self.settings_manager = None
+
         # Initialize URL filter engine
         self.filter_engine = URLFilterEngine(self.db)
         logger.info("URL filter engine initialized")
@@ -71,11 +83,42 @@ class AnthropicCaptureAddon:
         init_worker(self.db, batch_size=10, batch_interval=0.1)
         logger.info("Background write worker initialized")
 
-        # Initialize data cleanup scheduler (if enabled)
+        # Initialize data cleanup with recycle bin support (if enabled)
         if DATA_CLEANUP_ENABLED:
             try:
-                self.cleanup_manager = DataCleanupManager(self.db)
-                self.cleanup_scheduler = CleanupScheduler(self.db, self.cleanup_manager)
+                # Check if recycle bin is enabled
+                use_recycle_bin = True
+                if self.settings_manager:
+                    use_recycle_bin = self.settings_manager.get_setting('recycle_bin_enabled', True)
+
+                if use_recycle_bin:
+                    # Initialize recycle bin manager
+                    recycle_bin_days = 7
+                    if self.settings_manager:
+                        recycle_bin_days = self.settings_manager.get_setting('recycle_bin_retention_days', 7)
+                    self.recycle_bin = RecycleBinManager(self.db, retention_days=recycle_bin_days)
+                    logger.info(f"Recycle bin manager initialized ({recycle_bin_days} days retention)")
+
+                    # Initialize log manager
+                    self.log_manager = CleanupLogManager(self.db)
+                    logger.info("Cleanup log manager initialized")
+
+                # Initialize cleanup manager with recycle bin support
+                self.cleanup_manager = DataCleanupManager(
+                    self.db,
+                    recycle_bin=self.recycle_bin,
+                    log_manager=self.log_manager,
+                    use_recycle_bin=use_recycle_bin
+                )
+
+                # Initialize cleanup scheduler
+                self.cleanup_scheduler = CleanupScheduler(
+                    self.db,
+                    cleanup_manager=self.cleanup_manager,
+                    recycle_bin=self.recycle_bin,
+                    log_manager=self.log_manager,
+                    settings_manager=self.settings_manager
+                )
                 self.cleanup_scheduler.start()
                 logger.info("Data cleanup scheduler initialized")
             except Exception as e:

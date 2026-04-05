@@ -2,6 +2,164 @@
   <div>
     <h1 class="page-title">Settings</h1>
 
+    <!-- Cleanup Settings Section -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          <i class="bi bi-trash"></i>
+          Data Cleanup Settings
+        </h3>
+      </div>
+      <div class="card-body">
+        <div v-if="cleanupSettings" class="cleanup-settings">
+          <!-- Enable/Disable -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Enable Auto Cleanup</span>
+              <span class="setting-desc">Automatically clean old data to save space</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" v-model="cleanupSettings.cleanup_enabled" @change="updateCleanupSettings">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Enable Recycle Bin</span>
+              <span class="setting-desc">Move cleaned data to recycle bin instead of deleting</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" v-model="cleanupSettings.recycle_bin_enabled" @change="updateCleanupSettings">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Data Retention Days -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Data Retention Days</span>
+              <span class="setting-desc">Keep full data for this many days before cleanup</span>
+            </div>
+            <div class="setting-control">
+              <input
+                type="number"
+                v-model.number="cleanupSettings.data_retention_days"
+                class="form-input number-input"
+                min="1"
+                max="365"
+                @change="updateCleanupSettings"
+              />
+              <span class="unit">days</span>
+            </div>
+          </div>
+
+          <!-- Recycle Bin Retention -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Recycle Bin Retention</span>
+              <span class="setting-desc">Keep data in recycle bin before permanent deletion</span>
+            </div>
+            <div class="setting-control">
+              <input
+                type="number"
+                v-model.number="cleanupSettings.recycle_bin_retention_days"
+                class="form-input number-input"
+                min="1"
+                max="30"
+                @change="updateCleanupSettings"
+              />
+              <span class="unit">days</span>
+            </div>
+          </div>
+
+          <!-- Cleanup Interval -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Cleanup Check Interval</span>
+              <span class="setting-desc">How often to check for old data</span>
+            </div>
+            <div class="setting-control">
+              <input
+                type="number"
+                v-model.number="cleanupSettings.cleanup_interval_hours"
+                class="form-input number-input"
+                min="1"
+                max="168"
+                @change="updateCleanupSettings"
+              />
+              <span class="unit">hours</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="loading">Loading settings...</div>
+
+        <!-- Actions -->
+        <div class="cleanup-actions" v-if="cleanupSettings">
+          <button class="btn btn-secondary" @click="showCleanupStats">
+            <i class="bi bi-bar-chart"></i> View Stats
+          </button>
+          <button class="btn btn-warning" @click="runCleanup" :disabled="runningCleanup">
+            <i class="bi bi-play-circle"></i>
+            {{ runningCleanup ? 'Running...' : 'Run Cleanup Now' }}
+          </button>
+          <button class="btn btn-primary" @click="viewRecycleBin">
+            <i class="bi bi-recycle"></i> View Recycle Bin
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cleanup Stats Modal -->
+    <div class="modal" v-if="showStatsModal">
+      <div class="modal-overlay" @click="showStatsModal = false"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Cleanup Statistics</h3>
+          <button class="btn btn-sm btn-outline" @click="showStatsModal = false">
+            <i class="bi bi-x"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div v-if="cleanupStats" class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value">{{ cleanupStats.total_cleanups }}</div>
+              <div class="stat-label">Total Cleanups</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ formatNumber(cleanupStats.total_records_processed) }}</div>
+              <div class="stat-label">Records Processed</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ cleanupStats.total_space_reclaimed_mb }} MB</div>
+              <div class="stat-label">Space Reclaimed</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ cleanupStats.recent_cleanups_7d }}</div>
+              <div class="stat-label">Last 7 Days</div>
+            </div>
+          </div>
+
+          <div v-if="recycleBinStats" class="recycle-bin-stats">
+            <h4>Recycle Bin</h4>
+            <div class="stat-row">
+              <span>Total Entries:</span>
+              <span class="value">{{ recycleBinStats.total_entries }}</span>
+            </div>
+            <div class="stat-row">
+              <span>Total Size:</span>
+              <span class="value">{{ recycleBinStats.total_size_mb }} MB</span>
+            </div>
+            <div class="stat-row">
+              <span>Expiring Soon:</span>
+              <span class="value">{{ recycleBinStats.expiring_soon }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- URL Filters Section -->
     <div class="card">
       <div class="card-header">
@@ -173,7 +331,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
+
+// URL Filters (existing)
 const filters = ref([])
 const stats = ref(null)
 const testUrl = ref('')
@@ -184,6 +346,13 @@ const editingFilter = ref(null)
 const formTestUrl = ref('')
 const formTestResult = ref(null)
 
+// Cleanup Settings (new)
+const cleanupSettings = ref(null)
+const cleanupStats = ref(null)
+const recycleBinStats = ref(null)
+const showStatsModal = ref(false)
+const runningCleanup = ref(false)
+
 const form = ref({
   name: '',
   pattern: '',
@@ -193,6 +362,101 @@ const form = ref({
   is_enabled: true
 })
 
+// Cleanup functions
+async function loadCleanupSettings() {
+  try {
+    const response = await fetch('/api/settings/cleanup')
+    if (response.ok) {
+      cleanupSettings.value = await response.json()
+    }
+  } catch (err) {
+    console.error('Failed to load cleanup settings:', err)
+  }
+}
+
+async function updateCleanupSettings() {
+  try {
+    // Update each setting individually
+    const settings = [
+      { key: 'cleanup_enabled', value: cleanupSettings.value.cleanup_enabled, type: 'bool' },
+      { key: 'recycle_bin_enabled', value: cleanupSettings.value.recycle_bin_enabled, type: 'bool' },
+      { key: 'data_retention_days', value: cleanupSettings.value.data_retention_days, type: 'int' },
+      { key: 'recycle_bin_retention_days', value: cleanupSettings.value.recycle_bin_retention_days, type: 'int' },
+      { key: 'cleanup_interval_hours', value: cleanupSettings.value.cleanup_interval_hours, type: 'int' },
+    ]
+
+    for (const setting of settings) {
+      await fetch(`/api/settings/${setting.key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(setting)
+      })
+    }
+  } catch (err) {
+    console.error('Failed to update cleanup settings:', err)
+    alert('Failed to save settings')
+  }
+}
+
+async function loadCleanupStats() {
+  try {
+    const [cleanupRes, recycleRes] = await Promise.all([
+      fetch('/api/cleanup/stats'),
+      fetch('/api/recycle-bin/stats')
+    ])
+
+    if (cleanupRes.ok) {
+      cleanupStats.value = await cleanupRes.json()
+    }
+    if (recycleRes.ok) {
+      recycleBinStats.value = await recycleRes.json()
+    }
+  } catch (err) {
+    console.error('Failed to load stats:', err)
+  }
+}
+
+async function showCleanupStats() {
+  await loadCleanupStats()
+  showStatsModal.value = true
+}
+
+async function runCleanup() {
+  if (!confirm('Run cleanup now? This will clean data older than the retention period.')) return
+
+  runningCleanup.value = true
+  try {
+    const response = await fetch('/api/cleanup/trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      alert(`Cleanup completed!\nRequests: ${result.requests_cleaned}\nTool calls: ${result.tool_calls_cleaned}\nSpace: ${result.space_reclaimed_bytes} bytes`)
+      await loadCleanupStats()
+    } else {
+      const error = await response.json()
+      alert('Cleanup failed: ' + (error.error || 'Unknown error'))
+    }
+  } catch (err) {
+    console.error('Failed to run cleanup:', err)
+    alert('Failed to run cleanup')
+  } finally {
+    runningCleanup.value = false
+  }
+}
+
+function viewRecycleBin() {
+  router.push('/recycle-bin')
+}
+
+function formatNumber(num) {
+  return num?.toLocaleString() || '0'
+}
+
+// URL Filters (existing)
 const sortedFilters = computed(() => {
   return [...filters.value].sort((a, b) => a.priority - b.priority)
 })
@@ -336,10 +600,119 @@ function closeModal() {
 onMounted(() => {
   loadFilters()
   loadStats()
+  loadCleanupSettings()
 })
 </script>
 
 <style scoped>
+/* Cleanup Settings */
+.cleanup-settings {
+  margin-bottom: 24px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-label {
+  flex: 1;
+}
+
+.setting-label span:first-child {
+  display: block;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.setting-desc {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.number-input {
+  width: 80px;
+  text-align: center;
+}
+
+.unit {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.cleanup-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-secondary);
+  padding: 16px;
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.stat-card .stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stat-card .stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.recycle-bin-stats {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.recycle-bin-stats h4 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.stat-row .value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Filter Stats (existing) */
 .filter-stats {
   display: flex;
   gap: 32px;

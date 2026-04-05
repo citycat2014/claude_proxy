@@ -54,6 +54,9 @@ class DatabaseWriteWorker:
         self.items_written = 0
         self.batches_written = 0
 
+        # Callback for write notifications (e.g., WebSocket broadcast)
+        self.on_write_callback = None
+
     def start(self):
         """Start the background worker thread."""
         if self._thread is not None and self._thread.is_alive():

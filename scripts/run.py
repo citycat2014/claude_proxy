@@ -5,6 +5,7 @@ Unified management script for Claude Code Capture.
 Usage:
     python scripts/run.py start [--proxy-port 8080] [--web-port 5000]
     python scripts/run.py stop
+    python scripts/run.py restart
     python scripts/run.py status
 """
 
@@ -262,6 +263,22 @@ def stop_all(proxy_port: int = DEFAULT_PROXY_PORT, web_port: int = DEFAULT_WEB_P
     kill_processes_on_port(web_port)
 
 
+def restart_all(proxy_port: int = DEFAULT_PROXY_PORT, web_port: int = DEFAULT_WEB_PORT):
+    """Restart all services."""
+    print("Claude Code Capture - Restarting...")
+    print("=" * 40)
+    stop_all(proxy_port, web_port)
+    time.sleep(1)  # Give ports time to release
+    start_proxy(proxy_port, web_port)
+    start_web(web_port)
+    print("=" * 40)
+    print("\n✓ All services restarted!")
+    print(f"\nConfigure Claude Code:")
+    print(f"  export HTTPS_PROXY=http://127.0.0.1:{proxy_port}")
+    print(f"  export HTTP_PROXY=http://127.0.0.1:{proxy_port}")
+    print(f"\nDashboard: http://127.0.0.1:{web_port}")
+
+
 def show_status():
     """Show status of all services."""
     print("Service Status:")
@@ -335,6 +352,21 @@ Examples:
         help=f"Web UI port to clean up (default: {DEFAULT_WEB_PORT})"
     )
 
+    # Restart command
+    restart_parser = subparsers.add_parser("restart", help="Restart all services")
+    restart_parser.add_argument(
+        "-p", "--proxy-port",
+        type=int,
+        default=DEFAULT_PROXY_PORT,
+        help=f"Proxy port (default: {DEFAULT_PROXY_PORT})"
+    )
+    restart_parser.add_argument(
+        "-w", "--web-port",
+        type=int,
+        default=DEFAULT_WEB_PORT,
+        help=f"Web UI port (default: {DEFAULT_WEB_PORT})"
+    )
+
     # Status command
     subparsers.add_parser("status", help="Show service status")
 
@@ -368,6 +400,9 @@ Examples:
         stop_all(args.proxy_port, args.web_port)
         print("=" * 40)
         print("\n✓ All services stopped")
+
+    elif args.command == "restart":
+        restart_all(args.proxy_port, args.web_port)
 
     elif args.command == "status":
         show_status()

@@ -89,6 +89,12 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 # Session tracking
 SESSION_TIMEOUT_SECONDS = int(os.getenv("SESSION_TIMEOUT_SECONDS", "3600"))  # 1 hour
 
+# Data retention settings
+DATA_RETENTION_DAYS = int(os.getenv("DATA_RETENTION_DAYS", "30"))  # Days to retain full data
+DATA_CLEANUP_ENABLED = os.getenv("DATA_CLEANUP_ENABLED", "true").lower() == "true"
+DATA_CLEANUP_INTERVAL_HOURS = int(os.getenv("DATA_CLEANUP_INTERVAL_HOURS", "24"))
+DATA_CLEANUP_BATCH_SIZE = int(os.getenv("DATA_CLEANUP_BATCH_SIZE", "100"))
+
 # Claude API settings (from Claude Code config)
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_AUTH_TOKEN") or os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")

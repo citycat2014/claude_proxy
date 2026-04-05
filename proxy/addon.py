@@ -15,12 +15,13 @@ from pathlib import Path
 from mitmproxy import http, ctx
 from mitmproxy.http import Headers
 
-from config.settings import TARGET_DOMAINS, DATABASE_PATH
+from config.settings import TARGET_DOMAINS, DATABASE_PATH, DATA_CLEANUP_ENABLED
 from proxy.anthropic_handler import AnthropicHandler, APIInteraction
 from proxy.filter_engine import URLFilterEngine
 from storage.database import Database
 from storage.models import Session, Request, ToolCall, Message
 from storage.worker import init_worker, enqueue_write, shutdown_worker
+from storage.cleanup import DataCleanupManager, CleanupScheduler
 
 # Configure logging
 logging.basicConfig(
@@ -51,6 +52,8 @@ class AnthropicCaptureAddon:
         self.handler = AnthropicHandler()
         self.db: Optional[Database] = None
         self.filter_engine: Optional[URLFilterEngine] = None
+        self.cleanup_manager: Optional[DataCleanupManager] = None
+        self.cleanup_scheduler: Optional[CleanupScheduler] = None
 
     def load(self, loader):
         """Called when the addon is loaded."""
@@ -67,6 +70,16 @@ class AnthropicCaptureAddon:
         # Initialize background write worker
         init_worker(self.db, batch_size=10, batch_interval=0.1)
         logger.info("Background write worker initialized")
+
+        # Initialize data cleanup scheduler (if enabled)
+        if DATA_CLEANUP_ENABLED:
+            try:
+                self.cleanup_manager = DataCleanupManager(self.db)
+                self.cleanup_scheduler = CleanupScheduler(self.db, self.cleanup_manager)
+                self.cleanup_scheduler.start()
+                logger.info("Data cleanup scheduler initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize cleanup scheduler: {e}")
 
     def request(self, flow: http.HTTPFlow) -> None:
         """
@@ -509,6 +522,14 @@ class AnthropicCaptureAddon:
     def done(self):
         """Called when the proxy is shutting down."""
         logger.info("Shutting down AnthropicCaptureAddon...")
+
+        # Shutdown cleanup scheduler
+        if self.cleanup_scheduler:
+            try:
+                self.cleanup_scheduler.stop(timeout=5.0)
+                logger.info("Cleanup scheduler stopped")
+            except Exception as e:
+                logger.warning(f"Error stopping cleanup scheduler: {e}")
 
         # Shutdown write worker and flush pending items
         shutdown_worker(timeout=10.0)

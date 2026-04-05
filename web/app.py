@@ -637,6 +637,57 @@ def broadcast_stats_update(stats_data):
 
 
 # ============================================================================
+# Cleanup API
+# ============================================================================
+
+@app.route("/api/cleanup/status", methods=["GET"])
+def api_cleanup_status():
+    """Get cleanup status and statistics."""
+    try:
+        from storage.cleanup import get_cleanup_status
+        stats = get_cleanup_status(db)
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error getting cleanup status: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cleanup/trigger", methods=["POST"])
+def api_cleanup_trigger():
+    """Manually trigger cleanup (admin only - no auth for now)."""
+    try:
+        from storage.cleanup import run_cleanup_now
+
+        data = request.get_json() or {}
+        days = data.get('days')
+        dry_run = data.get('dry_run', False)
+
+        results = run_cleanup_now(db, days=days, dry_run=dry_run)
+        return jsonify(results)
+    except Exception as e:
+        logger.error(f"Error triggering cleanup: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cleanup/vacuum", methods=["POST"])
+def api_cleanup_vacuum():
+    """Run database VACUUM to reclaim space."""
+    try:
+        from storage.cleanup import DataCleanupManager
+
+        cleanup = DataCleanupManager(db)
+        success = cleanup.vacuum_database()
+
+        if success:
+            return jsonify({"success": True, "message": "Database vacuum completed"})
+        else:
+            return jsonify({"success": False, "error": "VACUUM failed"}), 500
+    except Exception as e:
+        logger.error(f"Error running vacuum: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
 # Main
 # ============================================================================
 

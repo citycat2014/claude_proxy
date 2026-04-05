@@ -15,14 +15,17 @@ from pathlib import Path
 from mitmproxy import http, ctx
 from mitmproxy.http import Headers
 
-from config.settings import TARGET_DOMAINS, DATABASE_PATH, DATA_CLEANUP_ENABLED
+from config.settings import TARGET_DOMAINS, DATABASE_PATH, DATA_CLEANUP_ENABLED, WEB_HOST, WEB_PORT
 from proxy.anthropic_handler import AnthropicHandler, APIInteraction
 from proxy.filter_engine import URLFilterEngine
 from storage.database import Database
 from storage.models import Session, Request, ToolCall, Message
-from storage.worker import init_worker, enqueue_write, shutdown_worker
+from storage.worker import init_worker, enqueue_write, shutdown_worker, get_worker
 from storage.cleanup import DataCleanupManager, CleanupScheduler
 from storage.recycle_bin import RecycleBinManager, CleanupLogManager, SettingsManager
+
+# SocketIO client for real-time WebSocket broadcast
+import socketio
 
 # Configure logging
 logging.basicConfig(
@@ -58,6 +61,7 @@ class AnthropicCaptureAddon:
         self.recycle_bin: Optional[RecycleBinManager] = None
         self.log_manager: Optional[CleanupLogManager] = None
         self.settings_manager: Optional[SettingsManager] = None
+        self._socketio_client: Optional[socketio.SimpleClient] = None
 
     def load(self, loader):
         """Called when the addon is loaded."""
@@ -82,6 +86,10 @@ class AnthropicCaptureAddon:
         # Initialize background write worker
         init_worker(self.db, batch_size=10, batch_interval=0.1)
         logger.info("Background write worker initialized")
+
+        # Initialize SocketIO client for real-time broadcast
+        self._socketio_client: Optional[socketio.SimpleClient] = None
+        self._init_socketio_client()
 
         # Initialize data cleanup with recycle bin support (if enabled)
         if DATA_CLEANUP_ENABLED:
@@ -123,6 +131,58 @@ class AnthropicCaptureAddon:
                 logger.info("Data cleanup scheduler initialized")
             except Exception as e:
                 logger.warning(f"Failed to initialize cleanup scheduler: {e}")
+
+    def _init_socketio_client(self):
+        """
+        Initialize SocketIO client for real-time broadcast with retry.
+
+        Starts a background thread to connect to the web server's SocketIO
+        endpoint, retrying with exponential backoff until successful.
+        """
+        import threading
+        import time
+
+        def connect_with_retry():
+            max_retries = 30  # Try for about 5 minutes
+            retry_delay = 2
+
+            for attempt in range(max_retries):
+                try:
+                    client = socketio.SimpleClient()
+                    socketio_url = f"http://{WEB_HOST}:{WEB_PORT}"
+                    client.connect(socketio_url)
+                    self._socketio_client = client
+                    logger.info(f"SocketIO client connected to {socketio_url} (attempt {attempt + 1})")
+
+                    # Set up write worker callback
+                    worker = get_worker()
+                    if worker:
+                        worker.on_write_callback = lambda req: self._broadcast_request(req.to_dict())
+                        logger.info("Write worker callback configured for SocketIO broadcast")
+                    return
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        logger.debug(f"SocketIO connection attempt {attempt + 1} failed: {e}. Retrying in {retry_delay}s...")
+                        time.sleep(retry_delay)
+                    else:
+                        logger.warning(f"Failed to connect SocketIO client after {max_retries} attempts: {e}. Real-time updates disabled.")
+
+        # Start connection in background thread
+        threading.Thread(target=connect_with_retry, daemon=True, name="SocketIOClient").start()
+
+    def _broadcast_request(self, request_data: Dict[str, Any]):
+        """
+        Broadcast a new request to connected clients via SocketIO.
+
+        Args:
+            request_data: Dict with request information
+        """
+        if self._socketio_client and self._socketio_client.connected:
+            try:
+                self._socketio_client.emit('new_request', request_data, room='requests')
+                logger.debug(f"Broadcasted new_request: {request_data.get('request_id', 'unknown')}")
+            except Exception as e:
+                logger.error(f"Failed to broadcast request: {e}")
 
     def request(self, flow: http.HTTPFlow) -> None:
         """
@@ -573,6 +633,14 @@ class AnthropicCaptureAddon:
                 logger.info("Cleanup scheduler stopped")
             except Exception as e:
                 logger.warning(f"Error stopping cleanup scheduler: {e}")
+
+        # Disconnect SocketIO client
+        if self._socketio_client and self._socketio_client.connected:
+            try:
+                self._socketio_client.disconnect()
+                logger.info("SocketIO client disconnected")
+            except Exception as e:
+                logger.warning(f"Error disconnecting SocketIO client: {e}")
 
         # Shutdown write worker and flush pending items
         shutdown_worker(timeout=10.0)

@@ -9,6 +9,13 @@
           <i class="bi bi-trash"></i>
           Data Cleanup Settings
         </h3>
+        <button
+          v-if="!isEditingSettings && cleanupSettings"
+          class="btn btn-sm btn-primary"
+          @click="startEditSettings"
+        >
+          <i class="bi bi-pencil"></i> Edit
+        </button>
       </div>
       <div class="card-body">
         <div v-if="cleanupSettings" class="cleanup-settings">
@@ -19,7 +26,11 @@
               <span class="setting-desc">Automatically clean old data to save space</span>
             </div>
             <label class="switch">
-              <input type="checkbox" v-model="cleanupSettings.cleanup_enabled" @change="updateCleanupSettings">
+              <input
+                type="checkbox"
+                v-model="editableSettings.cleanup_enabled"
+                :disabled="!isEditingSettings"
+              >
               <span class="slider"></span>
             </label>
           </div>
@@ -30,7 +41,11 @@
               <span class="setting-desc">Move cleaned data to recycle bin instead of deleting</span>
             </div>
             <label class="switch">
-              <input type="checkbox" v-model="cleanupSettings.recycle_bin_enabled" @change="updateCleanupSettings">
+              <input
+                type="checkbox"
+                v-model="editableSettings.recycle_bin_enabled"
+                :disabled="!isEditingSettings"
+              >
               <span class="slider"></span>
             </label>
           </div>
@@ -44,11 +59,11 @@
             <div class="setting-control">
               <input
                 type="number"
-                v-model.number="cleanupSettings.data_retention_days"
+                v-model.number="editableSettings.data_retention_days"
                 class="form-input number-input"
                 min="1"
                 max="365"
-                @change="updateCleanupSettings"
+                :disabled="!isEditingSettings"
               />
               <span class="unit">days</span>
             </div>
@@ -63,11 +78,11 @@
             <div class="setting-control">
               <input
                 type="number"
-                v-model.number="cleanupSettings.recycle_bin_retention_days"
+                v-model.number="editableSettings.recycle_bin_retention_days"
                 class="form-input number-input"
                 min="1"
                 max="30"
-                @change="updateCleanupSettings"
+                :disabled="!isEditingSettings"
               />
               <span class="unit">days</span>
             </div>
@@ -82,11 +97,11 @@
             <div class="setting-control">
               <input
                 type="number"
-                v-model.number="cleanupSettings.cleanup_interval_hours"
+                v-model.number="editableSettings.cleanup_interval_hours"
                 class="form-input number-input"
                 min="1"
                 max="168"
-                @change="updateCleanupSettings"
+                :disabled="!isEditingSettings"
               />
               <span class="unit">hours</span>
             </div>
@@ -95,8 +110,19 @@
 
         <div v-else class="loading">Loading settings...</div>
 
-        <!-- Actions -->
-        <div class="cleanup-actions" v-if="cleanupSettings">
+        <!-- Edit Actions -->
+        <div v-if="isEditingSettings" class="edit-actions">
+          <button class="btn btn-outline" @click="cancelEditSettings">
+            <i class="bi bi-x"></i> Cancel
+          </button>
+          <button class="btn btn-primary" @click="saveSettings" :disabled="savingSettings">
+            <i class="bi bi-check"></i>
+            {{ savingSettings ? 'Saving...' : 'Save Changes' }}
+          </button>
+        </div>
+
+        <!-- Actions (view mode) -->
+        <div class="cleanup-actions" v-if="cleanupSettings && !isEditingSettings">
           <button class="btn btn-secondary" @click="showCleanupStats">
             <i class="bi bi-bar-chart"></i> View Stats
           </button>
@@ -348,6 +374,9 @@ const formTestResult = ref(null)
 
 // Cleanup Settings (new)
 const cleanupSettings = ref(null)
+const editableSettings = ref({})
+const isEditingSettings = ref(false)
+const savingSettings = ref(false)
 const cleanupStats = ref(null)
 const recycleBinStats = ref(null)
 const showStatsModal = ref(false)
@@ -368,33 +397,59 @@ async function loadCleanupSettings() {
     const response = await fetch('/api/settings/cleanup')
     if (response.ok) {
       cleanupSettings.value = await response.json()
+      // Copy to editable settings
+      editableSettings.value = { ...cleanupSettings.value }
     }
   } catch (err) {
     console.error('Failed to load cleanup settings:', err)
   }
 }
 
-async function updateCleanupSettings() {
+function startEditSettings() {
+  // Copy current settings to editable
+  editableSettings.value = { ...cleanupSettings.value }
+  isEditingSettings.value = true
+}
+
+function cancelEditSettings() {
+  isEditingSettings.value = false
+  // Reset editable settings
+  editableSettings.value = { ...cleanupSettings.value }
+}
+
+async function saveSettings() {
+  savingSettings.value = true
   try {
     // Update each setting individually
     const settings = [
-      { key: 'cleanup_enabled', value: cleanupSettings.value.cleanup_enabled, type: 'bool' },
-      { key: 'recycle_bin_enabled', value: cleanupSettings.value.recycle_bin_enabled, type: 'bool' },
-      { key: 'data_retention_days', value: cleanupSettings.value.data_retention_days, type: 'int' },
-      { key: 'recycle_bin_retention_days', value: cleanupSettings.value.recycle_bin_retention_days, type: 'int' },
-      { key: 'cleanup_interval_hours', value: cleanupSettings.value.cleanup_interval_hours, type: 'int' },
+      { key: 'cleanup_enabled', value: editableSettings.value.cleanup_enabled, type: 'bool' },
+      { key: 'recycle_bin_enabled', value: editableSettings.value.recycle_bin_enabled, type: 'bool' },
+      { key: 'data_retention_days', value: editableSettings.value.data_retention_days, type: 'int' },
+      { key: 'recycle_bin_retention_days', value: editableSettings.value.recycle_bin_retention_days, type: 'int' },
+      { key: 'cleanup_interval_hours', value: editableSettings.value.cleanup_interval_hours, type: 'int' },
     ]
 
     for (const setting of settings) {
-      await fetch(`/api/settings/${setting.key}`, {
+      const response = await fetch(`/api/settings/${setting.key}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(setting)
+        body: JSON.stringify({ value: setting.value, type: setting.type })
       })
+
+      if (!response.ok) {
+        throw new Error(`Failed to update ${setting.key}`)
+      }
     }
+
+    // Update saved settings
+    cleanupSettings.value = { ...editableSettings.value }
+    isEditingSettings.value = false
+    alert('Settings saved successfully!')
   } catch (err) {
-    console.error('Failed to update cleanup settings:', err)
-    alert('Failed to save settings')
+    console.error('Failed to save settings:', err)
+    alert('Failed to save settings: ' + err.message)
+  } finally {
+    savingSettings.value = false
   }
 }
 
@@ -622,6 +677,10 @@ onMounted(() => {
   border-bottom: none;
 }
 
+.setting-row:has(input:disabled) {
+  opacity: 0.7;
+}
+
 .setting-label {
   flex: 1;
 }
@@ -650,6 +709,11 @@ onMounted(() => {
   text-align: center;
 }
 
+.number-input:disabled {
+  background: var(--bg-secondary);
+  cursor: not-allowed;
+}
+
 .unit {
   color: var(--text-secondary);
   font-size: 13px;
@@ -660,6 +724,14 @@ onMounted(() => {
   gap: 12px;
   padding-top: 16px;
   border-top: 1px solid var(--border-color);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  justify-content: flex-end;
 }
 
 /* Stats Grid */

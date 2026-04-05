@@ -2,30 +2,30 @@
   <div v-if="request">
     <!-- Breadcrumb -->
     <div class="breadcrumb">
-      <router-link to="/sessions">Sessions</router-link>
+      <router-link to="/sessions">{{ $t('requestDetail.breadcrumb.sessions') }}</router-link>
       <span class="separator">/</span>
-      <router-link :to="`/sessions/${request.session_id}`">Session</router-link>
+      <router-link :to="`/sessions/${request.session_id}`">{{ $t('requestDetail.breadcrumb.session') }}</router-link>
       <span class="separator">/</span>
-      <span class="current">Request</span>
+      <span class="current">{{ $t('requestDetail.breadcrumb.request') }}</span>
     </div>
 
     <!-- Metrics Bar -->
     <div class="metrics-bar">
       <div class="metric-card">
         <div class="metric-value">{{ formatTokens(request.input_tokens) }}</div>
-        <div class="metric-label">Input Tokens</div>
+        <div class="metric-label">{{ $t('requestDetail.metrics.inputTokens') }}</div>
       </div>
       <div class="metric-card">
         <div class="metric-value">{{ formatTokens(request.output_tokens) }}</div>
-        <div class="metric-label">Output Tokens</div>
+        <div class="metric-label">{{ $t('requestDetail.metrics.outputTokens') }}</div>
       </div>
       <div class="metric-card">
         <div class="metric-value">{{ formatCost(request.cost) }}</div>
-        <div class="metric-label">Cost</div>
+        <div class="metric-label">{{ $t('requestDetail.metrics.cost') }}</div>
       </div>
       <div class="metric-card">
         <div class="metric-value">{{ formatDuration(request.response_time_ms) }}</div>
-        <div class="metric-label">Response Time</div>
+        <div class="metric-label">{{ $t('requestDetail.metrics.responseTime') }}</div>
       </div>
     </div>
 
@@ -37,7 +37,7 @@
           <div class="card-header">
             <h3 class="card-title">
               <i class="bi bi-chat-dots"></i>
-              Messages
+              {{ $t('requestDetail.messages') }}
             </h3>
           </div>
           <div class="card-body">
@@ -57,7 +57,7 @@
           <div class="card-header">
             <h3 class="card-title">
               <i class="bi bi-robot"></i>
-              Assistant Response
+              {{ $t('requestDetail.assistantResponse') }}
             </h3>
           </div>
           <div class="card-body">
@@ -70,7 +70,7 @@
           <div class="card-header">
             <h3 class="card-title">
               <i class="bi bi-brain"></i>
-              Thinking Process
+              {{ $t('requestDetail.thinkingProcess') }}
             </h3>
           </div>
           <div class="card-body">
@@ -83,49 +83,49 @@
         <!-- Metadata Panel -->
         <div class="metadata-panel">
           <div class="metadata-section">
-            <div class="metadata-section-title">Request Info</div>
+            <div class="metadata-section-title">{{ $t('requestDetail.requestInfo') }}</div>
             <div class="metadata-item">
-              <span class="metadata-label">Request ID</span>
+              <span class="metadata-label">{{ $t('requestDetail.requestId') }}</span>
               <span class="metadata-value">{{ request.request_id }}</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">Session ID</span>
+              <span class="metadata-label">{{ $t('requestDetail.sessionId') }}</span>
               <router-link :to="`/sessions/${request.session_id}`" class="metadata-value">
                 {{ request.session_id }}
               </router-link>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">Timestamp</span>
+              <span class="metadata-label">{{ $t('requestDetail.timestamp') }}</span>
               <span class="metadata-value">{{ formatDateTime(request.timestamp) }}</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">Model</span>
+              <span class="metadata-label">{{ $t('requestDetail.model') }}</span>
               <span class="metadata-value">{{ request.model || '-' }}</span>
             </div>
           </div>
 
           <div class="metadata-section">
-            <div class="metadata-section-title">Token Usage</div>
+            <div class="metadata-section-title">{{ $t('requestDetail.tokenUsage') }}</div>
             <div class="metadata-item">
-              <span class="metadata-label">Input Tokens</span>
+              <span class="metadata-label">{{ $t('requestDetail.metrics.inputTokens') }}</span>
               <span class="metadata-value">{{ formatNumber(request.input_tokens) }}</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">Output Tokens</span>
+              <span class="metadata-label">{{ $t('requestDetail.metrics.outputTokens') }}</span>
               <span class="metadata-value">{{ formatNumber(request.output_tokens) }}</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">Cache Creation</span>
+              <span class="metadata-label">{{ $t('requestDetail.cacheCreation') }}</span>
               <span class="metadata-value">{{ formatNumber(request.cache_creation_tokens) }}</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">Cache Read</span>
+              <span class="metadata-label">{{ $t('requestDetail.cacheRead') }}</span>
               <span class="metadata-value">{{ formatNumber(request.cache_read_tokens) }}</span>
             </div>
           </div>
 
           <div class="metadata-section">
-            <div class="metadata-section-title">Tool Calls</div>
+            <div class="metadata-section-title">{{ $t('requestDetail.toolCalls') }}</div>
             <div v-if="toolCalls.length > 0" class="tool-calls-list">
               <div
                 v-for="tool in toolCalls"
@@ -138,7 +138,7 @@
               </div>
             </div>
             <div v-else class="text-muted" style="font-size: 12px;">
-              No tool calls
+              {{ $t('requestDetail.noToolCalls') }}
             </div>
           </div>
         </div>
@@ -149,21 +149,23 @@
   <!-- Loading -->
   <div v-else-if="loading" class="loading">
     <div class="loading-spinner"></div>
-    Loading request...
+    {{ $t('requestDetail.loading') }}
   </div>
 
   <!-- Error -->
   <div v-else class="error-state">
     <i class="bi bi-exclamation-triangle" style="font-size: 48px;"></i>
-    <div class="empty-state-title">Request not found</div>
+    <div class="empty-state-title">{{ $t('requestDetail.notFound') }}</div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { formatDateTime, formatNumber, formatTokens, formatCost, formatDuration } from '@/utils/formatters'
 
+const { t } = useI18n()
 const route = useRoute()
 const requestId = route.params.id
 

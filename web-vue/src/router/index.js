@@ -6,6 +6,7 @@ import RequestDetail from '@/views/RequestDetail.vue'
 import Analysis from '@/views/Analysis.vue'
 import Settings from '@/views/Settings.vue'
 import RecycleBin from '@/views/RecycleBin.vue'
+import CleanupLogs from '@/views/CleanupLogs.vue'
 
 const routes = [
   {
@@ -45,6 +46,12 @@ const routes = [
     name: 'RecycleBin',
     component: RecycleBin,
     meta: { title: 'Recycle Bin' }
+  },
+  {
+    path: '/cleanup-logs',
+    name: 'CleanupLogs',
+    component: CleanupLogs,
+    meta: { title: 'Cleanup Logs' }
   },
   {
     path: '/settings',

@@ -4,25 +4,25 @@
     <div class="filter-bar" style="margin-bottom: 20px; padding: 12px 16px; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 24px;">
       <!-- Time Filter -->
       <div style="display: flex; align-items: center; gap: 12px;">
-        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Time Range:</span>
+        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">{{ $t('dashboard.timeRange') }}:</span>
         <select
           v-model="timeFilter"
           @change="onTimeFilterChange"
           style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 150px; cursor: pointer;"
         >
-          <option :value="0.5">Last 30 Minutes</option>
-          <option :value="1">Last 1 Hour</option>
-          <option :value="5">Last 5 Hours</option>
-          <option :value="24">Last 24 Hours</option>
-          <option :value="168">Last 7 Days</option>
-          <option :value="720">Last 30 Days</option>
-          <option :value="null">All Time</option>
+          <option :value="0.5">{{ $t('dashboard.timeRangeOptions.last30Minutes') }}</option>
+          <option :value="1">{{ $t('dashboard.timeRangeOptions.last1Hour') }}</option>
+          <option :value="5">{{ $t('dashboard.timeRangeOptions.last5Hours') }}</option>
+          <option :value="24">{{ $t('dashboard.timeRangeOptions.last24Hours') }}</option>
+          <option :value="168">{{ $t('dashboard.timeRangeOptions.last7Days') }}</option>
+          <option :value="720">{{ $t('dashboard.timeRangeOptions.last30Days') }}</option>
+          <option :value="null">{{ $t('dashboard.timeRangeOptions.allTime') }}</option>
         </select>
       </div>
 
       <!-- Model Filter -->
       <div style="display: flex; align-items: center; gap: 12px;">
-        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Model:</span>
+        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">{{ $t('dashboard.model') }}:</span>
         <div class="model-filter-wrapper" style="position: relative;">
           <div
             class="model-filter-trigger"
@@ -45,7 +45,7 @@
               <input
                 v-model="modelSearchQuery"
                 type="text"
-                placeholder="Search models..."
+                :placeholder="$t('dashboard.modelFilter.searchModels')"
                 style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px;"
                 @click.stop
               >
@@ -57,12 +57,12 @@
                 class="action-btn"
                 @click="selectAllModels"
                 style="padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); font-size: 11px; color: var(--text-secondary); cursor: pointer;"
-              >Select All</button>
+              >{{ $t('dashboard.modelFilter.selectAll') }}</button>
               <button
                 class="action-btn"
                 @click="clearModelSelection"
                 style="padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); font-size: 11px; color: var(--text-secondary); cursor: pointer;"
-              >Clear</button>
+              >{{ $t('dashboard.modelFilter.clear') }}</button>
             </div>
 
             <!-- Model List -->
@@ -98,7 +98,7 @@
 
             <!-- Footer -->
             <div style="padding: 8px 12px; border-top: 1px solid var(--border-color); background: var(--bg-secondary); font-size: 11px; color: var(--text-secondary); text-align: center;">
-              {{ availableModels.length }} models available
+              {{ $t('dashboard.modelFilter.modelsAvailable', { count: availableModels.length }) }}
             </div>
           </div>
         </div>
@@ -109,71 +109,71 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-header">
-          <span class="stat-label">Total Requests</span>
+          <span class="stat-label">{{ $t('dashboard.stats.totalRequests') }}</span>
           <div class="stat-icon primary">
             <i class="bi bi-chat-dots"></i>
           </div>
         </div>
         <div class="stat-value">{{ formatNumber(stats.totalRequests) }}</div>
-        <div class="stat-subtitle">Today: {{ formatNumber(stats.requestsToday) }}</div>
+        <div class="stat-subtitle">{{ $t('dashboard.stats.today', { count: formatNumber(stats.requestsToday) }) }}</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-header">
-          <span class="stat-label">Sessions</span>
+          <span class="stat-label">{{ $t('dashboard.stats.sessions') }}</span>
           <div class="stat-icon success">
             <i class="bi bi-collection"></i>
           </div>
         </div>
         <div class="stat-value">{{ formatNumber(stats.totalSessions) }}</div>
-        <div class="stat-subtitle">Unique sessions</div>
+        <div class="stat-subtitle">{{ $t('dashboard.stats.uniqueSessions') }}</div>
       </div>
 
       <div class="stat-card">
         <div class="stat-header">
-          <span class="stat-label">Total Tokens</span>
+          <span class="stat-label">{{ $t('dashboard.stats.totalTokens') }}</span>
           <div class="stat-icon info">
             <i class="bi bi-cpu"></i>
           </div>
         </div>
         <div class="stat-value">{{ formatNumber(stats.totalTokens) }}</div>
         <div class="stat-subtitle">
-          Input: {{ formatNumber(stats.totalInputTokens) }} / Output: {{ formatNumber(stats.totalOutputTokens) }}
+          {{ $t('dashboard.stats.inputOutput', { input: formatNumber(stats.totalInputTokens), output: formatNumber(stats.totalOutputTokens) }) }}
         </div>
         <div class="stat-subtitle" style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
-          <i class="bi bi-lightning-charge"></i> Cache Read: {{ formatNumber(stats.cacheReadTokens) }} |
-          <i class="bi bi-database"></i> Cache Write: {{ formatNumber(stats.cacheCreationTokens) }}
+          <i class="bi bi-lightning-charge"></i> {{ $t('dashboard.stats.cacheRead', { count: formatNumber(stats.cacheReadTokens) }) }} |
+          <i class="bi bi-database"></i> {{ $t('dashboard.stats.cacheWrite', { count: formatNumber(stats.cacheCreationTokens) }) }}
         </div>
       </div>
 
       <div class="stat-card">
         <div class="stat-header">
-          <span class="stat-label">Total Cost</span>
+          <span class="stat-label">{{ $t('dashboard.stats.totalCost') }}</span>
           <div class="stat-icon warning">
             <i class="bi bi-currency-dollar"></i>
           </div>
         </div>
         <div class="stat-value">{{ formatCost(stats.totalCost) }}</div>
-        <div class="stat-subtitle">Today: {{ formatCost(stats.costToday) }}</div>
+        <div class="stat-subtitle">{{ $t('dashboard.stats.today', { count: formatCost(stats.costToday) }) }}</div>
       </div>
 
       <!-- Success Rate Card -->
       <div class="stat-card">
         <div class="stat-header">
-          <span class="stat-label">API Success Rate</span>
+          <span class="stat-label">{{ $t('dashboard.stats.apiSuccessRate') }}</span>
           <div class="stat-icon" :class="successRateClass">
             <i class="bi" :class="successRateIcon"></i>
           </div>
         </div>
         <div class="stat-value" :style="{ color: successRateColor }">{{ successRateStats.success_rate }}%</div>
         <div class="stat-subtitle">
-          {{ formatNumber(successRateStats.successful_requests) }} / {{ formatNumber(successRateStats.total_requests) }} successful
+          {{ $t('dashboard.stats.successful', { successful: formatNumber(successRateStats.successful_requests), total: formatNumber(successRateStats.total_requests) }) }}
         </div>
         <div class="stat-subtitle" style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
-          <span v-if="successRateStats.breakdown" title="2xx Success | 4xx Client Error | 5xx Server Error">
-            <span style="color: var(--success)">2xx: {{ successRateStats.breakdown['2xx'] || 0 }}</span> |
-            <span style="color: var(--warning)">4xx: {{ successRateStats.breakdown['4xx'] || 0 }}</span> |
-            <span style="color: var(--danger)">5xx: {{ successRateStats.breakdown['5xx'] || 0 }}</span>
+          <span v-if="successRateStats.breakdown" :title="$t('dashboard.tooltips.percentiles')">
+            <span style="color: var(--success)">{{ $t('dashboard.stats.status2xx', { count: successRateStats.breakdown['2xx'] || 0 }) }}</span> |
+            <span style="color: var(--warning)">{{ $t('dashboard.stats.status4xx', { count: successRateStats.breakdown['4xx'] || 0 }) }}</span> |
+            <span style="color: var(--danger)">{{ $t('dashboard.stats.status5xx', { count: successRateStats.breakdown['5xx'] || 0 }) }}</span>
           </span>
         </div>
       </div>
@@ -185,7 +185,7 @@
         <div class="card-header">
           <h3 class="card-title">
             <i class="bi bi-graph-up"></i>
-            Request Volume
+            {{ $t('dashboard.charts.requestVolume') }}
           </h3>
           <span class="text-muted" style="font-size: 12px;">{{ chartSubtitle }}</span>
         </div>
@@ -198,7 +198,7 @@
         <div class="card-header">
           <h3 class="card-title">
             <i class="bi bi-pie-chart"></i>
-            Model Distribution
+            {{ $t('dashboard.charts.modelDistribution') }}
           </h3>
         </div>
         <div class="card-body">
@@ -213,9 +213,9 @@
         <div class="card-header">
           <h3 class="card-title">
             <i class="bi bi-stopwatch"></i>
-            Response Time Breakdown
+            {{ $t('dashboard.charts.responseTimeBreakdown') }}
           </h3>
-          <span class="text-muted" style="font-size: 12px;">Average phase timing (ms)</span>
+          <span class="text-muted" style="font-size: 12px;">{{ $t('dashboard.charts.avgPhaseTiming') }}</span>
         </div>
         <div class="card-body">
           <canvas ref="timingChart" height="200"></canvas>
@@ -226,27 +226,27 @@
         <div class="card-header">
           <h3 class="card-title">
             <i class="bi bi-speedometer2"></i>
-            Latency Percentiles
+            {{ $t('dashboard.charts.latencyPercentiles') }}
             <i class="bi bi-question-circle" style="font-size: 14px; margin-left: 8px; color: var(--text-muted); cursor: help;"
-               title="Percentiles show the distribution of response times. P50 means half of requests are faster. P95 means 95% of requests are faster (only 5% slower). P99 captures outliers."></i>
+               :title="$t('dashboard.tooltips.percentiles')"></i>
           </h3>
         </div>
         <div class="card-body">
           <div class="latency-stats">
-            <div class="latency-item" title="P50 (Median): 50% of requests are faster than this value. Half of all requests complete within this time.">
-              <div class="latency-label">P50 (Median)</div>
+            <div class="latency-item" :title="$t('dashboard.tooltips.p50')">
+              <div class="latency-label">{{ $t('dashboard.charts.p50Median') }}</div>
               <div class="latency-value">{{ formatNumber(timingStats.p50_ms) }} ms</div>
             </div>
-            <div class="latency-item" title="P95: 95% of requests are faster than this value. Only 5% of requests are slower.">
-              <div class="latency-label">P95</div>
+            <div class="latency-item" :title="$t('dashboard.tooltips.p95')">
+              <div class="latency-label">{{ $t('dashboard.charts.p95') }}</div>
               <div class="latency-value">{{ formatNumber(timingStats.p95_ms) }} ms</div>
             </div>
-            <div class="latency-item" title="P99: 99% of requests are faster than this value. Only 1% of requests (outliers) are slower.">
-              <div class="latency-label">P99</div>
+            <div class="latency-item" :title="$t('dashboard.tooltips.p99')">
+              <div class="latency-label">{{ $t('dashboard.charts.p99') }}</div>
               <div class="latency-value">{{ formatNumber(timingStats.p99_ms) }} ms</div>
             </div>
-            <div class="latency-item" title="Average: Sum of all response times divided by number of requests. Can be skewed by outliers.">
-              <div class="latency-label">Average</div>
+            <div class="latency-item" :title="$t('dashboard.tooltips.average')">
+              <div class="latency-label">{{ $t('dashboard.charts.average') }}</div>
               <div class="latency-value">{{ formatNumber(timingStats.avg_ms) }} ms</div>
             </div>
           </div>
@@ -260,7 +260,7 @@
         <div class="card-header">
           <h3 class="card-title">
             <i class="bi bi-tools"></i>
-            Top Tools
+            {{ $t('dashboard.charts.topTools') }}
           </h3>
         </div>
         <div class="card-body">
@@ -272,23 +272,23 @@
         <div class="card-header">
           <h3 class="card-title">
             <i class="bi bi-lightning-charge"></i>
-            Streaming Latency
+            {{ $t('dashboard.charts.streamingLatency') }}
             <i class="bi bi-question-circle" style="font-size: 14px; margin-left: 8px; color: var(--text-muted); cursor: help;"
-               title="Streaming metrics measure the real-time response characteristics. Lower times indicate faster, more responsive streaming."></i>
+               :title="$t('dashboard.tooltips.streaming')"></i>
           </h3>
         </div>
         <div class="card-body">
           <div class="streaming-stats">
-            <div class="streaming-item" title="Time from sending request to receiving the first token in the streaming response. Includes network latency + server processing time.">
-              <div class="streaming-label">Time to First Token</div>
+            <div class="streaming-item" :title="$t('dashboard.tooltips.firstToken')">
+              <div class="streaming-label">{{ $t('dashboard.charts.timeToFirstToken') }}</div>
               <div class="streaming-value">{{ formatNumber(streamingStats.avg_time_to_first_token_ms) }} ms</div>
             </div>
-            <div class="streaming-item" title="Average time between consecutive tokens in the streaming response. Lower is better for smooth streaming.">
-              <div class="streaming-label">Avg Token Latency</div>
+            <div class="streaming-item" :title="$t('dashboard.tooltips.tokenLatency')">
+              <div class="streaming-label">{{ $t('dashboard.charts.avgTokenLatency') }}</div>
               <div class="streaming-value">{{ formatNumber(streamingStats.avg_token_latency_ms) }} ms</div>
             </div>
-            <div class="streaming-item" title="Time To First Byte (TTFB): Server processing time from receiving the request to sending the first byte of response. Pure server-side latency.">
-              <div class="streaming-label">Server Processing (TTFB)</div>
+            <div class="streaming-item" :title="$t('dashboard.tooltips.ttfb')">
+              <div class="streaming-label">{{ $t('dashboard.charts.serverProcessing') }}</div>
               <div class="streaming-value">{{ formatNumber(timingBreakdown.avg_wait_ms) }} ms</div>
             </div>
           </div>
@@ -300,12 +300,15 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Chart from 'chart.js/auto'
 import { useStatisticsStore } from '@/stores/statistics'
 import { useChartsStore } from '@/stores/charts'
 import { useSessionsStore } from '@/stores/sessions'
 import { useSocketStore } from '@/stores/socket'
 import { formatNumber, formatCost, formatDateTime } from '@/utils/formatters'
+
+const { t, n } = useI18n()
 
 const statsStore = useStatisticsStore()
 const chartsStore = useChartsStore()
@@ -342,9 +345,9 @@ const filteredModels = computed(() => {
 })
 
 const modelFilterText = computed(() => {
-  if (selectedModels.value.length === 0) return 'All Models'
+  if (selectedModels.value.length === 0) return t('dashboard.modelFilter.allModels')
   if (selectedModels.value.length === 1) return selectedModels.value[0]
-  return `${selectedModels.value.length} models selected`
+  return t('dashboard.modelFilter.modelsSelected', { count: selectedModels.value.length })
 })
 const toolStats = ref([])
 const timingStats = ref({ avg_ms: 0, p50_ms: 0, p95_ms: 0, p99_ms: 0 })
@@ -390,13 +393,13 @@ const successRateColor = computed(() => {
 })
 
 const chartSubtitle = computed(() => {
-  if (timeFilter.value === 720) return 'Last 30 days'
-  if (timeFilter.value === 168) return 'Last 7 days'
-  if (timeFilter.value === 24) return 'Last 24 hours'
-  if (timeFilter.value === 5) return 'Last 5 hours'
-  if (timeFilter.value === 1) return 'Last 1 hour'
-  if (timeFilter.value === 0.5) return 'Last 30 minutes'
-  return 'Last 7 days'
+  if (timeFilter.value === 720) return t('dashboard.timeRangeOptions.last30Days')
+  if (timeFilter.value === 168) return t('dashboard.timeRangeOptions.last7Days')
+  if (timeFilter.value === 24) return t('dashboard.timeRangeOptions.last24Hours')
+  if (timeFilter.value === 5) return t('dashboard.timeRangeOptions.last5Hours')
+  if (timeFilter.value === 1) return t('dashboard.timeRangeOptions.last1Hour')
+  if (timeFilter.value === 0.5) return t('dashboard.timeRangeOptions.last30Minutes')
+  return t('dashboard.timeRangeOptions.last7Days')
 })
 
 function onTimeFilterChange() {
@@ -582,7 +585,7 @@ function updateRequestsChart() {
       data: {
         labels,
         datasets: [{
-          label: 'Requests',
+          label: t('dashboard.stats.totalRequests'),
           data,
           borderColor: '#6366f1',
           backgroundColor: 'rgba(99, 102, 241, 0.1)',
@@ -668,7 +671,7 @@ function updateToolsChart() {
     data: {
       labels,
       datasets: [{
-        label: 'Calls',
+        label: t('dashboard.charts.calls'),
         data,
         backgroundColor: '#6366f1',
         borderRadius: 4
@@ -696,7 +699,13 @@ function updateToolsChart() {
 function updateTimingChart() {
   if (!timingChart.value) return
 
-  const labels = ['Connect', 'TLS', 'Send', 'Wait', 'Receive']
+  const labels = [
+    t('Connect'),
+    t('TLS'),
+    t('Send'),
+    t('Wait'),
+    t('Receive')
+  ]
   const data = [
     timingBreakdown.value.avg_connect_ms || 0,
     timingBreakdown.value.avg_tls_ms || 0,
@@ -714,7 +723,7 @@ function updateTimingChart() {
     data: {
       labels,
       datasets: [{
-        label: 'Time (ms)',
+        label: t('dashboard.charts.avgPhaseTiming'),
         data,
         backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
         borderRadius: 4
@@ -732,7 +741,7 @@ function updateTimingChart() {
           grid: { color: '#e2e8f0' },
           title: {
             display: true,
-            text: 'Milliseconds'
+            text: t('dashboard.charts.milliseconds')
           }
         },
         x: {

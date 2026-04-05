@@ -1,0 +1,446 @@
+{
+  "app": {
+    "name": "Capture",
+    "title": "Claude Code Capture",
+    "systemOnline": "System Online",
+    "systemOffline": "System Offline"
+  },
+  "nav": {
+    "overview": "Overview",
+    "dashboard": "Dashboard",
+    "sessions": "Sessions",
+    "analysis": "Analysis",
+    "recycleBin": "Recycle Bin",
+    "cleanupLogs": "Cleanup Logs",
+    "settings": "Settings"
+  },
+  "common": {
+    "search": "Search",
+    "clear": "Clear",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "add": "Add",
+    "close": "Close",
+    "loading": "Loading...",
+    "refresh": "Refresh",
+    "view": "View",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "select": "Select",
+    "all": "All",
+    "none": "None",
+    "ok": "OK",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "active": "Active",
+    "inactive": "Inactive",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info",
+    "actions": "Actions",
+    "status": "Status",
+    "name": "Name",
+    "type": "Type",
+    "date": "Date",
+    "time": "Time",
+    "description": "Description",
+    "test": "Test",
+    "Connect": "Connect",
+    "TLS": "TLS",
+    "Send": "Send",
+    "Wait": "Wait",
+    "Receive": "Receive"
+  },
+  "language": {
+    "title": "Language",
+    "en": "English",
+    "zhCN": "简体中文"
+  },
+  "dashboard": {
+    "timeRange": "Time Range",
+    "timeRangeOptions": {
+      "last30Minutes": "Last 30 Minutes",
+      "last1Hour": "Last 1 Hour",
+      "last5Hours": "Last 5 Hours",
+      "last24Hours": "Last 24 Hours",
+      "last7Days": "Last 7 Days",
+      "last30Days": "Last 30 Days",
+      "allTime": "All Time"
+    },
+    "model": "Model",
+    "modelFilter": {
+      "allModels": "All Models",
+      "modelsSelected": "{count} models selected",
+      "searchModels": "Search models...",
+      "selectAll": "Select All",
+      "clear": "Clear",
+      "modelsAvailable": "{count} models available"
+    },
+    "stats": {
+      "totalRequests": "Total Requests",
+      "today": "Today: {count}",
+      "sessions": "Sessions",
+      "uniqueSessions": "Unique sessions",
+      "totalTokens": "Total Tokens",
+      "inputOutput": "Input: {input} / Output: {output}",
+      "cacheRead": "Cache Read: {count}",
+      "cacheWrite": "Cache Write: {count}",
+      "totalCost": "Total Cost",
+      "apiSuccessRate": "API Success Rate",
+      "successful": "{successful} / {total} successful",
+      "status2xx": "2xx: {count}",
+      "status4xx": "4xx: {count}",
+      "status5xx": "5xx: {count}"
+    },
+    "charts": {
+      "requestVolume": "Request Volume",
+      "modelDistribution": "Model Distribution",
+      "responseTimeBreakdown": "Response Time Breakdown",
+      "avgPhaseTiming": "Average phase timing (ms)",
+      "latencyPercentiles": "Latency Percentiles",
+      "p50Median": "P50 (Median)",
+      "p95": "P95",
+      "p99": "P99",
+      "average": "Average",
+      "topTools": "Top Tools",
+      "streamingLatency": "Streaming Latency",
+      "timeToFirstToken": "Time to First Token",
+      "avgTokenLatency": "Avg Token Latency",
+      "serverProcessing": "Server Processing (TTFB)",
+      "milliseconds": "Milliseconds",
+      "calls": "Calls"
+    },
+    "tooltips": {
+      "percentiles": "Percentiles show the distribution of response times. P50 means half of requests are faster. P95 means 95% of requests are faster (only 5% slower). P99 captures outliers.",
+      "p50": "P50 (Median): 50% of requests are faster than this value.",
+      "p95": "P95: 95% of requests are faster than this value.",
+      "p99": "P99: 99% of requests are faster than this value.",
+      "average": "Average: Sum of all response times divided by number of requests.",
+      "streaming": "Streaming metrics measure the real-time response characteristics.",
+      "firstToken": "Time from sending request to receiving the first token.",
+      "tokenLatency": "Average time between consecutive tokens in the streaming response.",
+      "ttfb": "Time To First Byte: Server processing time from receiving request to sending first byte."
+    }
+  },
+  "sessions": {
+    "title": "All Sessions",
+    "subtitle": "Browse and inspect captured Claude Code sessions",
+    "filters": {
+      "sessionId": "Session ID",
+      "requestId": "Request ID",
+      "model": "Model",
+      "fromDate": "From Date",
+      "toDate": "To Date",
+      "searchSessionId": "Search session ID...",
+      "searchRequestId": "Search request ID...",
+      "allModels": "All Models",
+      "failedOnly": "Failed Only"
+    },
+    "table": {
+      "sessionId": "Session ID",
+      "started": "Started",
+      "model": "Model",
+      "requests": "Requests",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "cost": "Cost",
+      "view": "View"
+    },
+    "results": {
+      "foundSessions": "Found {count} session | Found {count} sessions",
+      "failedOnly": "Failed requests only",
+      "clearFilters": "Clear filters"
+    },
+    "loading": "Loading sessions...",
+    "error": {
+      "title": "Failed to Load Sessions",
+      "message": "An error occurred while loading sessions"
+    },
+    "empty": {
+      "noFilters": "No sessions captured yet",
+      "withFilters": "No sessions match your filters",
+      "tryAdjusting": "Try adjusting your search criteria",
+      "willAppear": "Sessions will appear here once data is collected"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "cleanup": {
+      "title": "Data Cleanup Settings",
+      "enableAutoCleanup": "Enable Auto Cleanup",
+      "enableAutoCleanupDesc": "Automatically clean old data to save space",
+      "enableRecycleBin": "Enable Recycle Bin",
+      "enableRecycleBinDesc": "Move cleaned data to recycle bin instead of deleting",
+      "dataRetentionDays": "Data Retention Days",
+      "dataRetentionDaysDesc": "Keep full data for this many days before cleanup",
+      "recycleBinRetention": "Recycle Bin Retention",
+      "recycleBinRetentionDesc": "Keep data in recycle bin before permanent deletion",
+      "cleanupInterval": "Cleanup Check Interval",
+      "cleanupIntervalDesc": "How often to check for old data",
+      "days": "days",
+      "hours": "hours",
+      "viewStats": "View Stats",
+      "runCleanupNow": "Run Cleanup Now",
+      "running": "Running...",
+      "viewRecycleBin": "View Recycle Bin",
+      "saving": "Saving...",
+      "saveChanges": "Save Changes",
+      "stats": {
+        "title": "Cleanup Statistics",
+        "totalCleanups": "Total Cleanups",
+        "recordsProcessed": "Records Processed",
+        "spaceReclaimed": "Space Reclaimed",
+        "last7Days": "Last 7 Days",
+        "recycleBin": "Recycle Bin",
+        "totalEntries": "Total Entries",
+        "totalSize": "Total Size",
+        "expiringSoon": "Expiring Soon"
+      }
+    },
+    "urlFilters": {
+      "title": "URL Filters",
+      "addFilter": "Add Filter",
+      "stats": {
+        "totalRules": "Total Rules",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "include": "Include",
+        "exclude": "Exclude"
+      },
+      "table": {
+        "priority": "Priority",
+        "pattern": "Pattern",
+        "action": "Action",
+        "status": "Status"
+      },
+      "testUrl": {
+        "title": "Test URL",
+        "placeholder": "Enter URL to test (e.g., https://api.anthropic.com/v1/messages)",
+        "test": "Test",
+        "wouldBeCaptured": "Would be CAPTURED",
+        "wouldBeIgnored": "Would be IGNORED"
+      },
+      "modal": {
+        "addTitle": "Add Filter",
+        "editTitle": "Edit Filter",
+        "name": "Name",
+        "namePlaceholder": "e.g., Anthropic API",
+        "pattern": "Pattern",
+        "patternPlaceholder": "e.g., api.anthropic.com",
+        "filterType": "Filter Type",
+        "action": "Action",
+        "priority": "Priority (lower = higher priority)",
+        "types": {
+          "domain": "Domain (substring match)",
+          "path": "Path (substring match)",
+          "exact": "Exact URL",
+          "wildcard": "Wildcard (*, ?)",
+          "regex": "Regular Expression"
+        },
+        "actions": {
+          "include": "Include (Capture)",
+          "exclude": "Exclude (Ignore)"
+        },
+        "testPattern": "Test Pattern",
+        "testPatternPlaceholder": "Enter URL to test pattern",
+        "matches": "MATCHES",
+        "doesNotMatch": "Does not match"
+      }
+    }
+  },
+  "recycleBin": {
+    "title": "Recycle Bin",
+    "stats": {
+      "totalEntries": "Total Entries",
+      "totalSize": "Total Size",
+      "expiringSoon": "Expiring Soon",
+      "within24Hours": "within 24 hours",
+      "retention": "Retention",
+      "autoDeleteAfter": "auto-delete after"
+    },
+    "byTable": "By Table",
+    "entries": "Entries",
+    "table": "Table",
+    "clearAll": "Clear All",
+    "empty": "Recycle bin is empty",
+    "detail": {
+      "title": "Entry Details",
+      "metadata": "Metadata",
+      "originalTable": "Original Table",
+      "originalId": "Original ID",
+      "requestId": "Request ID",
+      "sessionId": "Session ID",
+      "cleanedAt": "Cleaned At",
+      "expiresAt": "Expires At",
+      "size": "Size",
+      "contentPreview": "Content Preview",
+      "close": "Close",
+      "deletePermanently": "Delete Permanently"
+    }
+  },
+  "cleanupLogs": {
+    "title": "Cleanup Logs",
+    "stats": {
+      "totalCleanups": "Total Cleanups",
+      "recordsProcessed": "Records Processed",
+      "spaceReclaimed": "Space Reclaimed",
+      "recent7d": "Recent (7d)",
+      "cleanupsThisWeek": "cleanups this week"
+    },
+    "byType": "By Type",
+    "cleanupHistory": "Cleanup History",
+    "allTypes": "All Types",
+    "auto": "Auto",
+    "manual": "Manual",
+    "recycleBinPurge": "Recycle Bin Purge",
+    "empty": "No cleanup logs found"
+  },
+  "analysis": {
+    "title": "Analysis",
+    "subtitle": "Detailed analysis of token usage and tool calls",
+    "tokenUsage": {
+      "title": "Token Usage Analysis",
+      "overall": "Overall Usage",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "totalTokens": "Total Tokens",
+      "totalCost": "Total Cost",
+      "byModel": "By Model",
+      "model": "Model",
+      "input": "Input",
+      "output": "Output",
+      "cost": "Cost"
+    },
+    "toolUsage": {
+      "title": "Tool Usage Analysis",
+      "mostUsed": "Most Used Tools",
+      "calls": "calls",
+      "distribution": "Tool Distribution",
+      "tool": "Tool",
+      "empty": "No tool usage data"
+    },
+    "loading": "Loading analysis..."
+  },
+  "requestDetail": {
+    "breadcrumb": {
+      "sessions": "Sessions",
+      "session": "Session",
+      "request": "Request"
+    },
+    "metrics": {
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "cost": "Cost",
+      "responseTime": "Response Time"
+    },
+    "messages": "Messages",
+    "assistantResponse": "Assistant Response",
+    "thinkingProcess": "Thinking Process",
+    "requestInfo": "Request Info",
+    "requestId": "Request ID",
+    "sessionId": "Session ID",
+    "timestamp": "Timestamp",
+    "model": "Model",
+    "tokenUsage": "Token Usage",
+    "cacheCreation": "Cache Creation",
+    "cacheRead": "Cache Read",
+    "toolCalls": "Tool Calls",
+    "noToolCalls": "No tool calls",
+    "loading": "Loading request...",
+    "notFound": "Request not found"
+  },
+  "sessionDetail": {
+    "breadcrumb": {
+      "sessions": "Sessions",
+      "current": "Session"
+    },
+    "sessionInfo": {
+      "title": "Session Information",
+      "sessionId": "Session ID",
+      "started": "Started",
+      "ended": "Ended",
+      "model": "Model",
+      "workingDirectory": "Working Directory"
+    },
+    "statistics": {
+      "title": "Statistics",
+      "totalRequests": "Total Requests",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "totalCost": "Total Cost"
+    },
+    "timeline": {
+      "title": "Conversation Timeline",
+      "filterByModel": "Filter by Model",
+      "allModels": "All Models",
+      "loading": "Loading conversation timeline...",
+      "toolCalls": "tool call(s)",
+      "viewDetails": "View Details",
+      "noRequests": "No requests in this session",
+      "showing": "Showing {count} of {total} requests",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {current} of {total}"
+    },
+    "loading": "Loading session...",
+    "error": "Failed to load session"
+  },
+  "recycleBin": {
+    "title": "Recycle Bin",
+    "refresh": "Refresh",
+    "clearAll": "Clear All",
+    "stats": {
+      "totalEntries": "Total Entries",
+      "totalSize": "Total Size",
+      "expiringSoon": "Expiring Soon",
+      "within24Hours": "within 24 hours",
+      "retention": "Retention",
+      "autoDeleteAfter": "auto-delete after"
+    },
+    "byTable": "By Table",
+    "entries": "Entries",
+    "allTables": "All Tables",
+    "requests": "Requests",
+    "toolCalls": "Tool Calls",
+    "messages": "Messages",
+    "loading": "Loading...",
+    "empty": "Recycle bin is empty",
+    "view": "View",
+    "delete": "Delete",
+    "request": "Request",
+    "session": "Session",
+    "cleaned": "Cleaned",
+    "expires": "Expires",
+    "size": "Size",
+    "detail": {
+      "title": "Entry Details",
+      "metadata": "Metadata",
+      "originalTable": "Original Table",
+      "originalId": "Original ID",
+      "requestId": "Request ID",
+      "sessionId": "Session ID",
+      "cleanedAt": "Cleaned At",
+      "expiresAt": "Expires At",
+      "type": "Type",
+      "contentPreview": "Content Preview",
+      "close": "Close",
+      "deletePermanently": "Delete Permanently"
+    },
+    "confirm": {
+      "deleteTitle": "Permanently delete this entry?",
+      "deleteDesc": "Table: {table}, ID: {id}, Size: {size} MB",
+      "clearTitle": "Clear all entries",
+      "clearDesc": "Clear all {count} entries from recycle bin? This will permanently delete {size} MB of data.",
+      "success": "Cleared {deleted} entries ({space} MB)",
+      "failed": "Failed to delete: {error}"
+    },
+    "page": "Page {current} of {total}"
+  }
+}

@@ -2,7 +2,7 @@
   <div v-if="store.currentSession">
     <!-- Breadcrumb -->
     <div class="breadcrumb">
-      <router-link to="/sessions">Sessions</router-link>
+      <router-link to="/sessions">{{ $t('sessionDetail.breadcrumb.sessions') }}</router-link>
       <span class="separator">/</span>
       <span class="current">{{ store.currentSession.session_id.substring(0, 16) }}...</span>
     </div>
@@ -14,24 +14,24 @@
         <div class="card-header">
           <h3 class="card-title">
             <i class="bi bi-info-circle"></i>
-            Session Information
+            {{ $t('sessionDetail.sessionInfo.title') }}
           </h3>
         </div>
         <div class="card-body">
           <div class="dl-grid">
-            <dt>Session ID</dt>
+            <dt>{{ $t('sessionDetail.sessionInfo.sessionId') }}</dt>
             <dd><code>{{ store.currentSession.session_id }}</code></dd>
 
-            <dt>Started</dt>
+            <dt>{{ $t('sessionDetail.sessionInfo.started') }}</dt>
             <dd>{{ formatDateTimeDetailed(store.currentSession.started_at) }}</dd>
 
-            <dt>Ended</dt>
+            <dt>{{ $t('sessionDetail.sessionInfo.ended') }}</dt>
             <dd>{{ store.currentSession.ended_at ? formatDateTimeDetailed(store.currentSession.ended_at) : '-' }}</dd>
 
-            <dt>Model</dt>
+            <dt>{{ $t('sessionDetail.sessionInfo.model') }}</dt>
             <dd>{{ formatModel(store.currentSession.model) }}</dd>
 
-            <dt>Working Directory</dt>
+            <dt>{{ $t('sessionDetail.sessionInfo.workingDirectory') }}</dt>
             <dd>{{ store.currentSession.working_directory || '-' }}</dd>
           </div>
         </div>
@@ -42,21 +42,21 @@
         <div class="card-header">
           <h3 class="card-title">
             <i class="bi bi-bar-chart"></i>
-            Statistics
+            {{ $t('sessionDetail.statistics.title') }}
           </h3>
         </div>
         <div class="card-body">
           <div class="dl-grid">
-            <dt>Total Requests</dt>
+            <dt>{{ $t('sessionDetail.statistics.totalRequests') }}</dt>
             <dd>{{ store.currentSession.total_requests }}</dd>
 
-            <dt>Input Tokens</dt>
+            <dt>{{ $t('sessionDetail.statistics.inputTokens') }}</dt>
             <dd>{{ formatTokens(store.currentSession.total_input_tokens) }}</dd>
 
-            <dt>Output Tokens</dt>
+            <dt>{{ $t('sessionDetail.statistics.outputTokens') }}</dt>
             <dd>{{ formatTokens(store.currentSession.total_output_tokens) }}</dd>
 
-            <dt>Total Cost</dt>
+            <dt>{{ $t('sessionDetail.statistics.totalCost') }}</dt>
             <dd>{{ formatCost(store.currentSession.total_cost) }}</dd>
           </div>
         </div>
@@ -69,19 +69,19 @@
         <div>
           <h3 class="card-title">
             <i class="bi bi-clock-history"></i>
-            Conversation Timeline
+            {{ $t('sessionDetail.timeline.title') }}
           </h3>
           <span class="text-muted" style="font-size: 12px;">
             {{ store.sessionPagination?.total || 0 }} total
           </span>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <label style="font-size: 12px; color: var(--text-secondary);">Filter by Model:</label>
+          <label style="font-size: 12px; color: var(--text-secondary);">{{ $t('sessionDetail.timeline.filterByModel') }}:</label>
           <select
             v-model="modelFilter"
             style="padding: 6px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 150px;"
           >
-            <option value="">All Models</option>
+            <option value="">{{ $t('sessionDetail.timeline.allModels') }}</option>
             <option v-for="model in availableModels" :key="model" :value="model">{{ model }}</option>
           </select>
         </div>
@@ -91,7 +91,7 @@
       <div style="padding: 24px;">
         <div v-if="store.loading" class="loading" style="text-align: center; padding: 48px;">
           <div class="loading-spinner" style="margin: 0 auto 16px;"></div>
-          <div>Loading conversation timeline...</div>
+          <div>{{ $t('sessionDetail.timeline.loading') }}</div>
         </div>
 
         <div v-else-if="filteredRequests.length > 0">
@@ -115,7 +115,7 @@
               <!-- Tool Calls Summary -->
               <div v-if="request.tool_calls && request.tool_calls.length > 0" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light);">
                 <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
-                  <i class="bi bi-tools"></i> {{ request.tool_calls.length }} tool call(s)
+                  <i class="bi bi-tools"></i> {{ request.tool_calls.length }} {{ $t('sessionDetail.timeline.toolCalls') }}
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                   <span
@@ -131,7 +131,7 @@
               <!-- Message Actions -->
               <div class="message-actions">
                 <router-link :to="`/requests/${request.request_id}`" class="btn btn-sm btn-outline">
-                  <i class="bi bi-eye"></i> View Details
+                  <i class="bi bi-eye"></i> {{ $t('sessionDetail.timeline.viewDetails') }}
                 </router-link>
               </div>
             </div>
@@ -154,14 +154,14 @@
         <!-- Empty State -->
         <div v-else class="empty-state">
           <div class="empty-state-icon"><i class="bi bi-inbox"></i></div>
-          <div class="empty-state-title">No requests in this session</div>
+          <div class="empty-state-title">{{ $t('sessionDetail.timeline.noRequests') }}</div>
         </div>
       </div>
 
       <!-- Pagination -->
       <div v-if="store.sessionPagination && store.sessionPagination.total_pages > 1" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; border-top: 1px solid var(--border-color);">
         <div style="font-size: 13px; color: var(--text-secondary);">
-          Showing {{ filteredRequests.length }} of {{ store.sessionPagination.total }} requests
+          {{ $t('sessionDetail.timeline.showing', { count: filteredRequests.length, total: store.sessionPagination.total }) }}
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <button
@@ -169,17 +169,17 @@
             :disabled="store.sessionPagination.page <= 1"
             @click="changePage(store.sessionPagination.page - 1)"
           >
-            <i class="bi bi-chevron-left"></i> Previous
+            <i class="bi bi-chevron-left"></i> {{ $t('sessionDetail.timeline.previous') }}
           </button>
           <span style="font-size: 13px; color: var(--text-secondary);">
-            Page {{ store.sessionPagination.page }} of {{ store.sessionPagination.total_pages }}
+            {{ $t('sessionDetail.timeline.page', { current: store.sessionPagination.page, total: store.sessionPagination.total_pages }) }}
           </span>
           <button
             class="btn btn-sm btn-outline"
             :disabled="store.sessionPagination.page >= store.sessionPagination.total_pages"
             @click="changePage(store.sessionPagination.page + 1)"
           >
-            Next <i class="bi bi-chevron-right"></i>
+            {{ $t('sessionDetail.timeline.next') }} <i class="bi bi-chevron-right"></i>
           </button>
         </div>
       </div>
@@ -189,13 +189,13 @@
   <!-- Loading State -->
   <div v-else-if="store.loading" class="loading">
     <div class="loading-spinner"></div>
-    Loading session...
+    {{ $t('sessionDetail.loading') }}
   </div>
 
   <!-- Error State -->
   <div v-else-if="store.error" class="error-state">
     <i class="bi bi-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
-    <div class="empty-state-title">Failed to load session</div>
+    <div class="empty-state-title">{{ $t('sessionDetail.error') }}</div>
     <p>{{ store.error }}</p>
   </div>
 </template>
@@ -203,9 +203,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useSessionsStore } from '@/stores/sessions'
 import { formatDateTime, formatDateTimeDetailed, formatModel, formatTokens, formatCost } from '@/utils/formatters'
 
+const { t } = useI18n()
 const route = useRoute()
 const store = useSessionsStore()
 

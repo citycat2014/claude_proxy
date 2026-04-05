@@ -1,0 +1,416 @@
+{
+  "app": {
+    "name": "Capture",
+    "title": "Claude Code 捕获工具",
+    "systemOnline": "系统在线",
+    "systemOffline": "系统离线"
+  },
+  "nav": {
+    "overview": "概览",
+    "dashboard": "仪表盘",
+    "sessions": "会话",
+    "analysis": "分析",
+    "recycleBin": "回收站",
+    "cleanupLogs": "清理日志",
+    "settings": "设置"
+  },
+  "common": {
+    "search": "搜索",
+    "clear": "清除",
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "delete": "删除",
+    "add": "添加",
+    "close": "关闭",
+    "loading": "加载中...",
+    "refresh": "刷新",
+    "view": "查看",
+    "back": "返回",
+    "next": "下一页",
+    "previous": "上一页",
+    "select": "选择",
+    "all": "全部",
+    "none": "无",
+    "ok": "确定",
+    "confirm": "确认",
+    "yes": "是",
+    "no": "否",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "active": "活跃",
+    "inactive": "非活跃",
+    "success": "成功",
+    "error": "错误",
+    "warning": "警告",
+    "info": "信息",
+    "actions": "操作",
+    "status": "状态",
+    "name": "名称",
+    "type": "类型",
+    "date": "日期",
+    "time": "时间",
+    "description": "描述",
+    "test": "测试",
+    "Connect": "连接",
+    "TLS": "TLS",
+    "Send": "发送",
+    "Wait": "等待",
+    "Receive": "接收"
+  },
+  "language": {
+    "title": "语言",
+    "en": "English",
+    "zhCN": "简体中文"
+  },
+  "dashboard": {
+    "timeRange": "时间范围",
+    "timeRangeOptions": {
+      "last30Minutes": "过去 30 分钟",
+      "last1Hour": "过去 1 小时",
+      "last5Hours": "过去 5 小时",
+      "last24Hours": "过去 24 小时",
+      "last7Days": "过去 7 天",
+      "last30Days": "过去 30 天",
+      "allTime": "全部时间"
+    },
+    "model": "模型",
+    "modelFilter": {
+      "allModels": "所有模型",
+      "modelsSelected": "已选择 {count} 个模型",
+      "searchModels": "搜索模型...",
+      "selectAll": "全选",
+      "clear": "清除",
+      "modelsAvailable": "可用 {count} 个模型"
+    },
+    "stats": {
+      "totalRequests": "总请求数",
+      "today": "今日：{count}",
+      "sessions": "会话数",
+      "uniqueSessions": "独立会话",
+      "totalTokens": "总令牌数",
+      "inputOutput": "输入：{input} / 输出：{output}",
+      "cacheRead": "缓存读取：{count}",
+      "cacheWrite": "缓存写入：{count}",
+      "totalCost": "总成本",
+      "apiSuccessRate": "API 成功率",
+      "successful": "{successful} / {total} 成功",
+      "status2xx": "2xx: {count}",
+      "status4xx": "4xx: {count}",
+      "status5xx": "5xx: {count}"
+    },
+    "charts": {
+      "requestVolume": "请求量",
+      "modelDistribution": "模型分布",
+      "responseTimeBreakdown": "响应时间分解",
+      "avgPhaseTiming": "平均阶段耗时 (毫秒)",
+      "latencyPercentiles": "延迟百分位数",
+      "p50Median": "P50 (中位数)",
+      "p95": "P95",
+      "p99": "P99",
+      "average": "平均值",
+      "topTools": "热门工具",
+      "streamingLatency": "流式延迟",
+      "timeToFirstToken": "首令牌时间",
+      "avgTokenLatency": "平均令牌延迟",
+      "serverProcessing": "服务器处理 (TTFB)",
+      "milliseconds": "毫秒",
+      "calls": "调用次数"
+    },
+    "tooltips": {
+      "percentiles": "百分位数显示响应时间的分布。P50 表示一半请求更快。P95 表示 95% 的请求更快（仅 5% 更慢）。P99 捕获异常值。",
+      "p50": "P50 (中位数): 50% 的请求比此值更快。",
+      "p95": "P95: 95% 的请求比此值更快。",
+      "p99": "P99: 99% 的请求比此值更快。",
+      "average": "平均值：所有响应时间总和除以请求数。",
+      "streaming": "流式指标衡量实时响应特性。",
+      "firstToken": "从发送请求到接收第一个令牌的时间。",
+      "tokenLatency": "流式响应中连续令牌之间的平均时间。",
+      "ttfb": "首字节时间：从接收请求到发送响应首字节的服务器处理时间。"
+    }
+  },
+  "sessions": {
+    "title": "所有会话",
+    "subtitle": "浏览和检查捕获的 Claude Code 会话",
+    "filters": {
+      "sessionId": "会话 ID",
+      "requestId": "请求 ID",
+      "model": "模型",
+      "fromDate": "开始日期",
+      "toDate": "结束日期",
+      "searchSessionId": "搜索会话 ID...",
+      "searchRequestId": "搜索请求 ID...",
+      "allModels": "所有模型",
+      "failedOnly": "仅失败"
+    },
+    "table": {
+      "sessionId": "会话 ID",
+      "started": "开始时间",
+      "model": "模型",
+      "requests": "请求数",
+      "inputTokens": "输入令牌",
+      "outputTokens": "输出令牌",
+      "cost": "成本",
+      "view": "查看"
+    },
+    "results": {
+      "foundSessions": "找到 {count} 个会话",
+      "failedOnly": "仅失败请求",
+      "clearFilters": "清除筛选"
+    },
+    "loading": "正在加载会话...",
+    "error": {
+      "title": "加载会话失败",
+      "message": "加载会话时发生错误"
+    },
+    "empty": {
+      "noFilters": "尚未捕获会话",
+      "withFilters": "没有匹配的会话",
+      "tryAdjusting": "尝试调整搜索条件",
+      "willAppear": "数据收集后会话将显示在此处"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "cleanup": {
+      "title": "数据清理设置",
+      "enableAutoCleanup": "启用自动清理",
+      "enableAutoCleanupDesc": "自动清理旧数据以节省空间",
+      "enableRecycleBin": "启用回收站",
+      "enableRecycleBinDesc": "将清理的数据移至回收站而非直接删除",
+      "dataRetentionDays": "数据保留天数",
+      "dataRetentionDaysDesc": "清理前保留完整数据的天数",
+      "recycleBinRetention": "回收站保留时间",
+      "recycleBinRetentionDesc": "在永久删除前保留在回收站的时间",
+      "cleanupInterval": "清理检查间隔",
+      "cleanupIntervalDesc": "检查旧数据的频率",
+      "days": "天",
+      "hours": "小时",
+      "viewStats": "查看统计",
+      "runCleanupNow": "立即运行清理",
+      "running": "运行中...",
+      "viewRecycleBin": "查看回收站",
+      "saving": "保存中...",
+      "saveChanges": "保存更改",
+      "stats": {
+        "title": "清理统计",
+        "totalCleanups": "总清理次数",
+        "recordsProcessed": "已处理记录",
+        "spaceReclaimed": "已回收空间",
+        "last7Days": "过去 7 天",
+        "recycleBin": "回收站",
+        "totalEntries": "总条目数",
+        "totalSize": "总大小",
+        "expiringSoon": "即将过期"
+      }
+    },
+    "urlFilters": {
+      "title": "URL 筛选器",
+      "addFilter": "添加筛选器",
+      "stats": {
+        "totalRules": "总规则数",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "include": "包含",
+        "exclude": "排除"
+      },
+      "table": {
+        "priority": "优先级",
+        "pattern": "模式",
+        "action": "操作",
+        "status": "状态"
+      },
+      "testUrl": {
+        "title": "测试 URL",
+        "placeholder": "输入要测试的 URL (例如：https://api.anthropic.com/v1/messages)",
+        "test": "测试",
+        "wouldBeCaptured": "将被捕获",
+        "wouldBeIgnored": "将被忽略"
+      },
+      "modal": {
+        "addTitle": "添加筛选器",
+        "editTitle": "编辑筛选器",
+        "name": "名称",
+        "namePlaceholder": "例如：Anthropic API",
+        "pattern": "模式",
+        "patternPlaceholder": "例如：api.anthropic.com",
+        "filterType": "筛选器类型",
+        "action": "操作",
+        "priority": "优先级 (数字越小优先级越高)",
+        "types": {
+          "domain": "域名 (子串匹配)",
+          "path": "路径 (子串匹配)",
+          "exact": "精确 URL",
+          "wildcard": "通配符 (*, ?)",
+          "regex": "正则表达式"
+        },
+        "actions": {
+          "include": "包含 (捕获)",
+          "exclude": "排除 (忽略)"
+        },
+        "testPattern": "测试模式",
+        "testPatternPlaceholder": "输入 URL 测试模式",
+        "matches": "匹配",
+        "doesNotMatch": "不匹配"
+      }
+    }
+  },
+  "recycleBin": {
+    "title": "回收站",
+    "refresh": "刷新",
+    "clearAll": "清空全部",
+    "stats": {
+      "totalEntries": "总条目数",
+      "totalSize": "总大小",
+      "expiringSoon": "即将过期",
+      "within24Hours": "24 小时内",
+      "retention": "保留期",
+      "autoDeleteAfter": "后自动删除"
+    },
+    "byTable": "按表分类",
+    "entries": "条目",
+    "allTables": "所有表",
+    "requests": "请求",
+    "toolCalls": "工具调用",
+    "messages": "消息",
+    "loading": "加载中...",
+    "empty": "回收站为空",
+    "view": "查看",
+    "delete": "删除",
+    "request": "请求",
+    "session": "会话",
+    "cleaned": "清理时间",
+    "expires": "过期时间",
+    "size": "大小",
+    "detail": {
+      "title": "条目详情",
+      "metadata": "元数据",
+      "originalTable": "原始表",
+      "originalId": "原始 ID",
+      "requestId": "请求 ID",
+      "sessionId": "会话 ID",
+      "cleanedAt": "清理时间",
+      "expiresAt": "过期时间",
+      "type": "类型",
+      "contentPreview": "内容预览",
+      "close": "关闭",
+      "deletePermanently": "永久删除"
+    },
+    "confirm": {
+      "deleteTitle": "永久删除此条目？",
+      "deleteDesc": "表：{table}, ID: {id}, 大小：{size} MB",
+      "clearTitle": "清空所有条目",
+      "clearDesc": "清空回收站中的 {count} 个条目？这将永久删除 {size} MB 的数据",
+      "success": "已清除 {deleted} 个条目 ({space} MB)",
+      "failed": "删除失败：{error}"
+    },
+    "page": "第 {current} 页 / 共 {total} 页"
+  },
+  "cleanupLogs": {
+    "title": "清理日志",
+    "stats": {
+      "totalCleanups": "总清理次数",
+      "recordsProcessed": "已处理记录",
+      "spaceReclaimed": "已回收空间",
+      "recent7d": "最近 (7 天)",
+      "cleanupsThisWeek": "本周清理次数"
+    },
+    "byType": "按类型分类",
+    "cleanupHistory": "清理历史",
+    "allTypes": "所有类型",
+    "auto": "自动",
+    "manual": "手动",
+    "recycleBinPurge": "回收站清理",
+    "empty": "暂无清理日志"
+  },
+  "analysis": {
+    "title": "分析",
+    "subtitle": "令牌使用和工具调用的详细分析",
+    "tokenUsage": {
+      "title": "令牌使用分析",
+      "overall": "总体使用",
+      "inputTokens": "输入令牌",
+      "outputTokens": "输出令牌",
+      "totalTokens": "总令牌数",
+      "totalCost": "总成本",
+      "byModel": "按模型分类",
+      "model": "模型",
+      "input": "输入",
+      "output": "输出",
+      "cost": "成本"
+    },
+    "toolUsage": {
+      "title": "工具使用分析",
+      "mostUsed": "最常用工具",
+      "calls": "次调用",
+      "distribution": "工具分布",
+      "tool": "工具",
+      "empty": "无工具使用数据"
+    },
+    "loading": "正在加载分析..."
+  },
+  "requestDetail": {
+    "breadcrumb": {
+      "sessions": "会话",
+      "session": "会话",
+      "request": "请求"
+    },
+    "metrics": {
+      "inputTokens": "输入令牌",
+      "outputTokens": "输出令牌",
+      "cost": "成本",
+      "responseTime": "响应时间"
+    },
+    "messages": "消息",
+    "assistantResponse": "助手响应",
+    "thinkingProcess": "思考过程",
+    "requestInfo": "请求信息",
+    "requestId": "请求 ID",
+    "sessionId": "会话 ID",
+    "timestamp": "时间戳",
+    "model": "模型",
+    "tokenUsage": "令牌使用",
+    "cacheCreation": "缓存创建",
+    "cacheRead": "缓存读取",
+    "toolCalls": "工具调用",
+    "noToolCalls": "无工具调用",
+    "loading": "正在加载请求...",
+    "notFound": "请求不存在"
+  },
+  "sessionDetail": {
+    "breadcrumb": {
+      "sessions": "会话",
+      "current": "会话"
+    },
+    "sessionInfo": {
+      "title": "会话信息",
+      "sessionId": "会话 ID",
+      "started": "开始时间",
+      "ended": "结束时间",
+      "model": "模型",
+      "workingDirectory": "工作目录"
+    },
+    "statistics": {
+      "title": "统计信息",
+      "totalRequests": "总请求数",
+      "inputTokens": "输入令牌",
+      "outputTokens": "输出令牌",
+      "totalCost": "总成本"
+    },
+    "timeline": {
+      "title": "会话时间线",
+      "filterByModel": "按模型筛选",
+      "allModels": "所有模型",
+      "loading": "正在加载会话时间线...",
+      "toolCalls": "个工具调用",
+      "viewDetails": "查看详情",
+      "noRequests": "此会话中无请求",
+      "showing": "显示 {count} / {total} 个请求",
+      "previous": "上一页",
+      "next": "下一页",
+      "page": "第 {current} 页 / 共 {total} 页"
+    },
+    "loading": "正在加载会话...",
+    "error": "加载会话失败"
+  }
+}

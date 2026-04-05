@@ -1,20 +1,20 @@
 <template>
   <div>
-    <h1 class="page-title">Settings</h1>
+    <h1 class="page-title">{{ $t('settings.title') }}</h1>
 
     <!-- Cleanup Settings Section -->
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">
           <i class="bi bi-trash"></i>
-          Data Cleanup Settings
+          {{ $t('settings.cleanup.title') }}
         </h3>
         <button
           v-if="!isEditingSettings && cleanupSettings"
           class="btn btn-sm btn-primary"
           @click="startEditSettings"
         >
-          <i class="bi bi-pencil"></i> Edit
+          <i class="bi bi-pencil"></i> {{ $t('common.edit') }}
         </button>
       </div>
       <div class="card-body">
@@ -22,8 +22,8 @@
           <!-- Enable/Disable -->
           <div class="setting-row">
             <div class="setting-label">
-              <span>Enable Auto Cleanup</span>
-              <span class="setting-desc">Automatically clean old data to save space</span>
+              <span>{{ $t('settings.cleanup.enableAutoCleanup') }}</span>
+              <span class="setting-desc">{{ $t('settings.cleanup.enableAutoCleanupDesc') }}</span>
             </div>
             <label class="switch">
               <input
@@ -37,8 +37,8 @@
 
           <div class="setting-row">
             <div class="setting-label">
-              <span>Enable Recycle Bin</span>
-              <span class="setting-desc">Move cleaned data to recycle bin instead of deleting</span>
+              <span>{{ $t('settings.cleanup.enableRecycleBin') }}</span>
+              <span class="setting-desc">{{ $t('settings.cleanup.enableRecycleBinDesc') }}</span>
             </div>
             <label class="switch">
               <input
@@ -53,8 +53,8 @@
           <!-- Data Retention Days -->
           <div class="setting-row">
             <div class="setting-label">
-              <span>Data Retention Days</span>
-              <span class="setting-desc">Keep full data for this many days before cleanup</span>
+              <span>{{ $t('settings.cleanup.dataRetentionDays') }}</span>
+              <span class="setting-desc">{{ $t('settings.cleanup.dataRetentionDaysDesc') }}</span>
             </div>
             <div class="setting-control">
               <input
@@ -65,15 +65,15 @@
                 max="365"
                 :disabled="!isEditingSettings"
               />
-              <span class="unit">days</span>
+              <span class="unit">{{ $t('settings.cleanup.days') }}</span>
             </div>
           </div>
 
           <!-- Recycle Bin Retention -->
           <div class="setting-row">
             <div class="setting-label">
-              <span>Recycle Bin Retention</span>
-              <span class="setting-desc">Keep data in recycle bin before permanent deletion</span>
+              <span>{{ $t('settings.cleanup.recycleBinRetention') }}</span>
+              <span class="setting-desc">{{ $t('settings.cleanup.recycleBinRetentionDesc') }}</span>
             </div>
             <div class="setting-control">
               <input
@@ -91,8 +91,8 @@
           <!-- Cleanup Interval -->
           <div class="setting-row">
             <div class="setting-label">
-              <span>Cleanup Check Interval</span>
-              <span class="setting-desc">How often to check for old data</span>
+              <span>{{ $t('settings.cleanup.cleanupInterval') }}</span>
+              <span class="setting-desc">{{ $t('settings.cleanup.cleanupIntervalDesc') }}</span>
             </div>
             <div class="setting-control">
               <input
@@ -103,35 +103,35 @@
                 max="168"
                 :disabled="!isEditingSettings"
               />
-              <span class="unit">hours</span>
+              <span class="unit">{{ $t('settings.cleanup.hours') }}</span>
             </div>
           </div>
         </div>
 
-        <div v-else class="loading">Loading settings...</div>
+        <div v-else class="loading">{{ $t('common.loading') }}</div>
 
         <!-- Edit Actions -->
         <div v-if="isEditingSettings" class="edit-actions">
           <button class="btn btn-outline" @click="cancelEditSettings">
-            <i class="bi bi-x"></i> Cancel
+            <i class="bi bi-x"></i> {{ $t('common.cancel') }}
           </button>
           <button class="btn btn-primary" @click="saveSettings" :disabled="savingSettings">
             <i class="bi bi-check"></i>
-            {{ savingSettings ? 'Saving...' : 'Save Changes' }}
+            {{ savingSettings ? $t('settings.cleanup.saving') : $t('settings.cleanup.saveChanges') }}
           </button>
         </div>
 
         <!-- Actions (view mode) -->
         <div class="cleanup-actions" v-if="cleanupSettings && !isEditingSettings">
           <button class="btn btn-secondary" @click="showCleanupStats">
-            <i class="bi bi-bar-chart"></i> View Stats
+            <i class="bi bi-bar-chart"></i> {{ $t('settings.cleanup.viewStats') }}
           </button>
           <button class="btn btn-warning" @click="runCleanup" :disabled="runningCleanup">
             <i class="bi bi-play-circle"></i>
-            {{ runningCleanup ? 'Running...' : 'Run Cleanup Now' }}
+            {{ runningCleanup ? $t('settings.cleanup.running') : $t('settings.cleanup.runCleanupNow') }}
           </button>
           <button class="btn btn-primary" @click="viewRecycleBin">
-            <i class="bi bi-recycle"></i> View Recycle Bin
+            <i class="bi bi-recycle"></i> {{ $t('settings.cleanup.viewRecycleBin') }}
           </button>
         </div>
       </div>
@@ -142,7 +142,7 @@
       <div class="modal-overlay" @click="showStatsModal = false"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Cleanup Statistics</h3>
+          <h3>{{ $t('settings.cleanup.stats.title') }}</h3>
           <button class="btn btn-sm btn-outline" @click="showStatsModal = false">
             <i class="bi bi-x"></i>
           </button>
@@ -151,7 +151,7 @@
           <div v-if="cleanupStats" class="stats-grid">
             <div class="stat-card">
               <div class="stat-value">{{ cleanupStats.total_cleanups }}</div>
-              <div class="stat-label">Total Cleanups</div>
+              <div class="stat-label">{{ $t('settings.cleanup.stats.totalCleanups') }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ formatNumber(cleanupStats.total_records_processed) }}</div>
@@ -191,10 +191,10 @@
       <div class="card-header">
         <h3 class="card-title">
           <i class="bi bi-filter"></i>
-          URL Filters
+          {{ $t('settings.urlFilters.title') }}
         </h3>
         <button class="btn btn-primary" @click="showAddModal = true">
-          <i class="bi bi-plus"></i> Add Filter
+          <i class="bi bi-plus"></i> {{ $t('settings.urlFilters.addFilter') }}
         </button>
       </div>
       <div class="card-body">
@@ -202,23 +202,23 @@
         <div class="filter-stats" v-if="stats">
           <div class="stat-item">
             <span class="stat-value">{{ stats.total }}</span>
-            <span class="stat-label">Total Rules</span>
+            <span class="stat-label">{{ $t('settings.urlFilters.stats.totalRules') }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-value text-success">{{ stats.enabled }}</span>
-            <span class="stat-label">Enabled</span>
+            <span class="stat-label">{{ $t('settings.urlFilters.stats.enabled') }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-value text-muted">{{ stats.disabled }}</span>
-            <span class="stat-label">Disabled</span>
+            <span class="stat-label">{{ $t('settings.urlFilters.stats.disabled') }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-value text-primary">{{ stats.include_rules }}</span>
-            <span class="stat-label">Include</span>
+            <span class="stat-label">{{ $t('settings.urlFilters.stats.include') }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-value text-warning">{{ stats.exclude_rules }}</span>
-            <span class="stat-label">Exclude</span>
+            <span class="stat-label">{{ $t('settings.urlFilters.stats.exclude') }}</span>
           </div>
         </div>
 
@@ -227,13 +227,13 @@
           <table class="table">
             <thead>
               <tr>
-                <th>Priority</th>
-                <th>Name</th>
-                <th>Pattern</th>
-                <th>Type</th>
-                <th>Action</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th>{{ $t('settings.urlFilters.table.priority') }}</th>
+                <th>{{ $t('common.name') }}</th>
+                <th>{{ $t('settings.urlFilters.table.pattern') }}</th>
+                <th>{{ $t('common.type') }}</th>
+                <th>{{ $t('settings.urlFilters.table.action') }}</th>
+                <th>{{ $t('common.status') }}</th>
+                <th>{{ $t('common.actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -268,21 +268,21 @@
 
         <!-- Test URL Section -->
         <div class="test-section">
-          <h4>Test URL</h4>
+          <h4>{{ $t('settings.urlFilters.testUrl.title') }}</h4>
           <div class="test-input-row">
             <input
               v-model="testUrl"
               type="text"
               class="form-input"
-              placeholder="Enter URL to test (e.g., https://api.anthropic.com/v1/messages)"
+              :placeholder="$t('settings.urlFilters.testUrl.placeholder')"
             />
             <button class="btn btn-secondary" @click="testUrlPattern">
-              Test
+              {{ $t('common.test') }}
             </button>
           </div>
           <div v-if="testResult" class="test-result" :class="testResult.allowed ? 'success' : 'denied'">
             <i :class="testResult.allowed ? 'bi bi-check-circle' : 'bi bi-x-circle'"></i>
-            {{ testResult.allowed ? 'Would be CAPTURED' : 'Would be IGNORED' }}
+            {{ testResult.allowed ? $t('settings.urlFilters.testUrl.wouldBeCaptured') : $t('settings.urlFilters.testUrl.wouldBeIgnored') }}
           </div>
         </div>
       </div>
@@ -293,61 +293,61 @@
       <div class="modal-overlay" @click="closeModal"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <h3>{{ editingFilter ? 'Edit Filter' : 'Add Filter' }}</h3>
+          <h3>{{ editingFilter ? $t('settings.urlFilters.modal.editTitle') : $t('settings.urlFilters.modal.addTitle') }}</h3>
           <button class="btn btn-sm btn-outline" @click="closeModal">
             <i class="bi bi-x"></i>
           </button>
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label>Name</label>
-            <input v-model="form.name" type="text" class="form-input" placeholder="e.g., Anthropic API" />
+            <label>{{ $t('settings.urlFilters.modal.name') }}</label>
+            <input v-model="form.name" type="text" class="form-input" :placeholder="$t('settings.urlFilters.modal.namePlaceholder')" />
           </div>
           <div class="form-group">
-            <label>Pattern</label>
-            <input v-model="form.pattern" type="text" class="form-input" placeholder="e.g., api.anthropic.com" />
+            <label>{{ $t('settings.urlFilters.modal.pattern') }}</label>
+            <input v-model="form.pattern" type="text" class="form-input" :placeholder="$t('settings.urlFilters.modal.patternPlaceholder')" />
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Filter Type</label>
+              <label>{{ $t('settings.urlFilters.modal.filterType') }}</label>
               <select v-model="form.filter_type" class="form-input">
-                <option value="domain">Domain (substring match)</option>
-                <option value="path">Path (substring match)</option>
-                <option value="exact">Exact URL</option>
-                <option value="wildcard">Wildcard (*, ?)</option>
-                <option value="regex">Regular Expression</option>
+                <option value="domain">{{ $t('settings.urlFilters.modal.types.domain') }}</option>
+                <option value="path">{{ $t('settings.urlFilters.modal.types.path') }}</option>
+                <option value="exact">{{ $t('settings.urlFilters.modal.types.exact') }}</option>
+                <option value="wildcard">{{ $t('settings.urlFilters.modal.types.wildcard') }}</option>
+                <option value="regex">{{ $t('settings.urlFilters.modal.types.regex') }}</option>
               </select>
             </div>
             <div class="form-group">
-              <label>Action</label>
+              <label>{{ $t('settings.urlFilters.modal.action') }}</label>
               <select v-model="form.action" class="form-input">
-                <option value="include">Include (Capture)</option>
-                <option value="exclude">Exclude (Ignore)</option>
+                <option value="include">{{ $t('settings.urlFilters.modal.actions.include') }}</option>
+                <option value="exclude">{{ $t('settings.urlFilters.modal.actions.exclude') }}</option>
               </select>
             </div>
           </div>
           <div class="form-group">
-            <label>Priority (lower = higher priority)</label>
+            <label>{{ $t('settings.urlFilters.modal.priority') }}</label>
             <input v-model.number="form.priority" type="number" class="form-input" min="0" max="1000" />
           </div>
 
           <!-- Live Test -->
           <div class="form-group">
-            <label>Test Pattern</label>
+            <label>{{ $t('settings.urlFilters.modal.testPattern') }}</label>
             <div class="test-input-row">
-              <input v-model="formTestUrl" type="text" class="form-input" placeholder="Enter URL to test pattern" />
-              <button class="btn btn-secondary" @click="testFormPattern">Test</button>
+              <input v-model="formTestUrl" type="text" class="form-input" :placeholder="$t('settings.urlFilters.modal.testPatternPlaceholder')" />
+              <button class="btn btn-secondary" @click="testFormPattern">{{ $t('common.test') }}</button>
             </div>
             <div v-if="formTestResult" class="test-result" :class="formTestResult.matched ? 'success' : 'denied'">
               <i :class="formTestResult.matched ? 'bi bi-check-circle' : 'bi bi-x-circle'"></i>
-              {{ formTestResult.matched ? 'MATCHES' : 'Does not match' }}
+              {{ formTestResult.matched ? $t('settings.urlFilters.modal.matches') : $t('settings.urlFilters.modal.doesNotMatch') }}
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-outline" @click="closeModal">Cancel</button>
+          <button class="btn btn-outline" @click="closeModal">{{ $t('common.cancel') }}</button>
           <button class="btn btn-primary" @click="saveFilter">
-            {{ editingFilter ? 'Update' : 'Add' }}
+            {{ editingFilter ? $t('common.save') : $t('common.add') }}
           </button>
         </div>
       </div>
@@ -358,8 +358,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
+const { t } = useI18n()
 
 // URL Filters (existing)
 const filters = ref([])

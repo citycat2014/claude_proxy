@@ -174,13 +174,20 @@ class AnthropicCaptureAddon:
         """
         Broadcast a new request to connected clients via SocketIO.
 
+        Sends to server's proxy_broadcast handler which then broadcasts
+        to all subscribed clients.
+
         Args:
             request_data: Dict with request information
         """
         if self._socketio_client and self._socketio_client.connected:
             try:
-                self._socketio_client.emit('new_request', request_data, room='requests')
-                logger.debug(f"Broadcasted new_request: {request_data.get('request_id', 'unknown')}")
+                self._socketio_client.emit('proxy_broadcast', {
+                    'event': 'new_request',
+                    'data': request_data,
+                    'room': 'requests'
+                })
+                logger.debug(f"Broadcasted new_request via proxy: {request_data.get('request_id', 'unknown')}")
             except Exception as e:
                 logger.error(f"Failed to broadcast request: {e}")
 

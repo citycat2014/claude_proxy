@@ -617,6 +617,27 @@ def handle_subscribe(data):
         join_room(channel)
     logger.info(f"Client subscribed to: {channels}")
 
+
+@socketio.on('proxy_broadcast')
+def handle_proxy_broadcast(data):
+    """
+    Handle broadcast requests from the proxy addon.
+
+    The proxy sends events here, and the server broadcasts them to all
+    subscribed clients.
+
+    Args:
+        data: Dict with 'event' name and 'data' payload
+    """
+    event_name = data.get('event')
+    payload = data.get('data')
+    room = data.get('room', 'requests')
+
+    if event_name and payload:
+        socketio.emit(event_name, payload, room=room)
+        logger.debug(f"Proxy broadcast: {event_name} to room {room}")
+
+
 def broadcast_new_request(request_data):
     """
     Broadcast a new request capture to all connected clients.

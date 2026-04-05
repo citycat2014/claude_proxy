@@ -5,8 +5,7 @@ Provides a web interface for viewing captured interactions,
 statistics, and analysis reports.
 """
 
-from flask import Flask, render_template, jsonify, request, send_from_directory
-from flask import Flask
+from flask import Flask, jsonify, request, send_from_directory
 import os
 import sys
 import json
@@ -22,7 +21,6 @@ from analysis.statistics import StatisticsEngine
 
 # Configuration
 VUE_DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'vue-dist')
-USE_VUE = os.environ.get('USE_VUE', 'true' if os.path.exists(VUE_DIST_DIR) else 'false').lower() == 'true'
 
 
 def format_datetime(dt) -> str:
@@ -136,9 +134,7 @@ def serialize_request(req, include_tool_calls: bool = False):
     return data
 
 # Create Flask app
-app = Flask(__name__,
-            template_folder="templates",
-            static_folder="static")
+app = Flask(__name__, static_folder="static")
 
 # Initialize components
 db = Database(DATABASE_PATH)
@@ -154,50 +150,44 @@ stats_engine = StatisticsEngine(db)
 @app.route("/")
 def index():
     """Dashboard page."""
-    if USE_VUE and os.path.exists(VUE_DIST_DIR):
-        return send_from_directory(VUE_DIST_DIR, 'index.html')
-    return render_template("index.html")
+    return send_from_directory(VUE_DIST_DIR, 'index.html')
 
 
 @app.route("/sessions")
 def sessions():
     """Sessions list page."""
-    if USE_VUE and os.path.exists(VUE_DIST_DIR):
-        return send_from_directory(VUE_DIST_DIR, 'index.html')
-    return render_template("sessions.html")
+    return send_from_directory(VUE_DIST_DIR, 'index.html')
 
 
 @app.route("/sessions/<session_id>")
 def session_detail(session_id):
     """Session detail page."""
-    if USE_VUE and os.path.exists(VUE_DIST_DIR):
-        return send_from_directory(VUE_DIST_DIR, 'index.html')
-    return render_template("session_detail.html", session_id=session_id)
+    return send_from_directory(VUE_DIST_DIR, 'index.html')
 
 
 @app.route("/requests/<request_id>")
 def request_detail(request_id):
     """Request detail page."""
-    if USE_VUE and os.path.exists(VUE_DIST_DIR):
-        return send_from_directory(VUE_DIST_DIR, 'index.html')
-    return render_template("request_detail.html", request_id=request_id)
+    return send_from_directory(VUE_DIST_DIR, 'index.html')
 
 
 @app.route("/analysis")
 def analysis():
     """Analysis page."""
-    if USE_VUE and os.path.exists(VUE_DIST_DIR):
-        return send_from_directory(VUE_DIST_DIR, 'index.html')
-    return render_template("analysis.html")
+    return send_from_directory(VUE_DIST_DIR, 'index.html')
+
+
+@app.route("/settings")
+def settings():
+    """Settings page."""
+    return send_from_directory(VUE_DIST_DIR, 'index.html')
 
 
 # Serve Vue static assets
 @app.route('/assets/<path:filename>')
 def serve_vue_assets(filename):
     """Serve Vue assets."""
-    if USE_VUE and os.path.exists(VUE_DIST_DIR):
-        return send_from_directory(os.path.join(VUE_DIST_DIR, 'assets'), filename)
-    return jsonify({"error": "Not found"}), 404
+    return send_from_directory(os.path.join(VUE_DIST_DIR, 'assets'), filename)
 
 
 # ============================================================================

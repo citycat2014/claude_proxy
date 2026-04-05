@@ -162,6 +162,7 @@ class DatabaseWriteWorker:
             item: Tuple of (session, request, tool_calls) or (request, tool_calls)
         """
         try:
+            request_data = None
             if len(item) == 3:
                 # Full item with session
                 session, request, tool_calls = item
@@ -170,12 +171,18 @@ class DatabaseWriteWorker:
                 self.db.save_request(request)
                 for tool_call in tool_calls:
                     self.db.save_tool_call(tool_call)
+                request_data = request
             else:
                 # Just request and tool calls
                 request, tool_calls = item
                 self.db.save_request(request)
                 for tool_call in tool_calls:
                     self.db.save_tool_call(tool_call)
+                request_data = request
+
+            # Broadcast WebSocket event if callback is set
+            if self.on_write_callback and request_data:
+                self.on_write_callback(request_data)
 
         except Exception as e:
             logger.error(f"Error writing item: {e}")

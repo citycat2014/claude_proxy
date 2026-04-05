@@ -6,9 +6,11 @@ statistics, and analysis reports.
 """
 
 from flask import Flask, jsonify, request, send_from_directory
+from flask_socketio import SocketIO, emit, join_room
 import os
 import sys
 import json
+import logging
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,6 +23,10 @@ from analysis.statistics import StatisticsEngine
 
 # Configuration
 VUE_DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'vue-dist')
+
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def format_datetime(dt) -> str:
@@ -135,12 +141,23 @@ def serialize_request(req, include_tool_calls: bool = False):
 
 # Create Flask app
 app = Flask(__name__, static_folder="static")
+app.config['SECRET_KEY'] = os.urandom(24).hex()
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # Initialize components
 db = Database(DATABASE_PATH)
 token_analyzer = TokenAnalyzer(db)
 tool_analyzer = ToolAnalyzer(db)
 stats_engine = StatisticsEngine(db)
+
+# Initialize async write worker with WebSocket broadcast
+from storage.worker import init_worker, get_worker
+init_worker(db, batch_size=10, batch_interval=0.1)
+worker = get_worker()
+if worker:
+    worker.on_write_callback = lambda req: broadcast_new_request(req.to_dict())
 
 
 # ============================================================================
@@ -573,6 +590,53 @@ def server_error(error):
 
 
 # ============================================================================
+# WebSocket Events
+# ============================================================================
+
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection."""
+    logger.info(f"Client connected: {request.sid if request else 'unknown'}")
+    emit('connected', {'message': 'Connected to real-time updates'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection."""
+    logger.info(f"Client disconnected: {request.sid if request else 'unknown'}")
+
+@socketio.on('subscribe')
+def handle_subscribe(data):
+    """
+    Handle client subscription to specific channels.
+
+    Args:
+        data: Dict with 'channels' list (e.g., ['requests', 'sessions'])
+    """
+    channels = data.get('channels', ['requests'])
+    for channel in channels:
+        join_room(channel)
+    logger.info(f"Client subscribed to: {channels}")
+
+def broadcast_new_request(request_data):
+    """
+    Broadcast a new request capture to all connected clients.
+
+    Args:
+        request_data: Dict with request information
+    """
+    socketio.emit('new_request', request_data, room='requests')
+
+def broadcast_stats_update(stats_data):
+    """
+    Broadcast statistics update to all connected clients.
+
+    Args:
+        stats_data: Dict with updated statistics
+    """
+    socketio.emit('stats_update', stats_data, room='stats')
+
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -580,7 +644,9 @@ def main():
     """Run the Flask application."""
     print(f"Starting web server at http://{WEB_HOST}:{WEB_PORT}")
     print(f"Database: {DATABASE_PATH}")
-    app.run(host=WEB_HOST, port=WEB_PORT, debug=DEBUG)
+    print(f"WebSocket enabled for real-time updates")
+    # Use socketio.run instead of app.run for WebSocket support
+    socketio.run(app, host=WEB_HOST, port=WEB_PORT, debug=DEBUG, allow_unsafe_werkzeug=True)
 
 
 if __name__ == "__main__":

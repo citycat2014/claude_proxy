@@ -144,6 +144,9 @@ class AnthropicCaptureAddon:
         is_streaming = self._is_streaming_response(flow)
 
         try:
+            # Convert response headers to dict
+            response_headers = dict(flow.response.headers) if flow.response else {}
+
             if is_streaming:
                 # Streaming response - parse SSE events
                 response_body = flow.response.content
@@ -159,6 +162,7 @@ class AnthropicCaptureAddon:
                     response_status=flow.response.status_code,
                     response_time_ms=response_time_ms,
                     response_body=response_body,
+                    response_headers=response_headers,
                 )
 
                 # Override with parsed streaming data
@@ -185,6 +189,7 @@ class AnthropicCaptureAddon:
                     response_status=flow.response.status_code,
                     response_time_ms=response_time_ms,
                     response_body=flow.response.content,
+                    response_headers=response_headers,
                 )
 
                 # Store the interaction with timing info (no streaming metrics for non-streaming)
@@ -439,6 +444,22 @@ class AnthropicCaptureAddon:
             logger.warning(f"Failed to deduplicate system-reminder: {e}")
             request_body_to_store = interaction.request_body
 
+        # Store tool calls with timing info if present
+        tool_calls = []
+        if interaction.parsed_response:
+            tool_uses = interaction.parsed_response.get_tool_uses()
+            tool_call_start_time = interaction.timestamp  # Use request timestamp as start
+            for idx, tool_use in enumerate(tool_uses):
+                tool_call = ToolCall(
+                    request_id=interaction.request_id,
+                    tool_name=tool_use.get("name", ""),
+                    tool_input_json=json.dumps(tool_use.get("input", {})),
+                    timestamp_start=tool_call_start_time,
+                    timestamp_end=datetime.now(),  # End time when captured
+                    duration_ms=None,  # Will be calculated when tool result is received
+                )
+                tool_calls.append(tool_call)
+
         # Create request record (without streaming response body to save space)
         request = Request(
             request_id=interaction.request_id,
@@ -471,6 +492,13 @@ class AnthropicCaptureAddon:
             time_to_first_token_ms=self._calc_time_to_first_token(timing.get('wait_ms'), parsed_response),
             time_to_last_token_ms=self._calc_time_to_last_token(timing.get('wait_ms'), parsed_response),
             avg_token_latency_ms=self._calc_avg_token_latency(parsed_response),
+            # Response headers
+            response_headers=json.dumps(interaction.response_headers) if interaction.response_headers else None,
+            x_request_id=interaction.x_request_id,
+            anthropic_version=interaction.anthropic_version,
+            ratelimit_limit=interaction.ratelimit_limit,
+            ratelimit_remaining=interaction.ratelimit_remaining,
+            ratelimit_reset=interaction.ratelimit_reset,
         )
 
         # Enqueue request for async write (instead of synchronous)

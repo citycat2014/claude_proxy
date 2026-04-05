@@ -4,6 +4,7 @@ import Sessions from '@/views/Sessions.vue'
 import SessionDetail from '@/views/SessionDetail.vue'
 import RequestDetail from '@/views/RequestDetail.vue'
 import Analysis from '@/views/Analysis.vue'
+import Settings from '@/views/Settings.vue'
 
 const routes = [
   {
@@ -37,6 +38,12 @@ const routes = [
     name: 'Analysis',
     component: Analysis,
     meta: { title: 'Analysis' }
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
+    meta: { title: 'Settings' }
   }
 ]
 

@@ -31,6 +31,12 @@
               Analysis
             </router-link>
           </li>
+          <li class="nav-item">
+            <router-link to="/settings" class="nav-link" :class="{ active: currentRoute === 'Settings' }">
+              <i class="bi bi-gear"></i>
+              Settings
+            </router-link>
+          </li>
         </ul>
       </div>
     </nav>

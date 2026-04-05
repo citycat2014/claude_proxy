@@ -304,11 +304,13 @@ import Chart from 'chart.js/auto'
 import { useStatisticsStore } from '@/stores/statistics'
 import { useChartsStore } from '@/stores/charts'
 import { useSessionsStore } from '@/stores/sessions'
+import { useSocketStore } from '@/stores/socket'
 import { formatNumber, formatCost, formatDateTime } from '@/utils/formatters'
 
 const statsStore = useStatisticsStore()
 const chartsStore = useChartsStore()
 const sessionsStore = useSessionsStore()
+const socketStore = useSocketStore()
 
 const timeFilter = ref(statsStore.timeFilter)
 const requestsChart = ref(null)
@@ -528,6 +530,16 @@ async function loadTimingData() {
   }
 }
 
+/**
+ * Handle real-time new request event.
+ * Refreshes dashboard data when new requests are captured.
+ */
+async function handleNewRequest(requestData) {
+  console.log('[Dashboard] New request captured, refreshing data...', requestData)
+  // Refresh dashboard data
+  await loadDashboardData()
+}
+
 function updateRequestsChart() {
   if (!requestsChart.value) return
 
@@ -734,10 +746,16 @@ function updateTimingChart() {
 onMounted(() => {
   loadDashboardData()
   document.addEventListener('click', handleClickOutside)
+
+  // Connect to WebSocket for real-time updates
+  socketStore.connect()
+  socketStore.onNewRequest(handleNewRequest)
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  socketStore.clearListeners()
+  // Note: Keep socket connected for navigation to other pages
 })
 
 watch(() => chartsStore.timelineData, updateRequestsChart)

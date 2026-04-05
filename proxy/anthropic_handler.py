@@ -65,6 +65,18 @@ class APIInteraction:
     # Cost
     cost: float = 0.0
 
+    # Response headers (captured for rate limiting and debugging)
+    response_headers: Dict[str, str] = None
+    x_request_id: str = ""
+    anthropic_version: str = ""
+    ratelimit_limit: int = 0
+    ratelimit_remaining: int = 0
+    ratelimit_reset: int = 0
+
+    def __post_init__(self):
+        if self.response_headers is None:
+            self.response_headers = {}
+
     def calculate_cost(self):
         """Calculate the cost of this interaction."""
         model = self.parsed_request.model
@@ -270,6 +282,7 @@ class AnthropicHandler:
         response_status: int,
         response_time_ms: int,
         response_body: bytes,
+        response_headers: Optional[Dict[str, str]] = None,
     ) -> APIInteraction:
         """
         Create an APIInteraction from request and response data.
@@ -279,6 +292,7 @@ class AnthropicHandler:
             response_status: HTTP status code
             response_time_ms: Response time in milliseconds
             response_body: Response body bytes
+            response_headers: Optional response headers dict
 
         Returns:
             APIInteraction
@@ -308,19 +322,35 @@ class AnthropicHandler:
             response_status=response_status,
             response_time_ms=response_time_ms,
             parsed_response=parsed_response,
-            request_body=json.dumps(parsed_request.raw_body),
             response_body=response_body_str,
         )
 
-        # Extract token usage
-        if parsed_response:
-            interaction.input_tokens = parsed_response.input_tokens
-            interaction.output_tokens = parsed_response.output_tokens
-            interaction.cache_creation_tokens = parsed_response.cache_creation_tokens
-            interaction.cache_read_tokens = parsed_response.cache_read_tokens
+        # Parse response headers if provided
+        if response_headers:
+            interaction.response_headers = response_headers
+            interaction.x_request_id = response_headers.get("x-request-id", "")
+            interaction.anthropic_version = response_headers.get("anthropic-version", "")
 
-        # Calculate cost
-        interaction.calculate_cost()
+            # Parse rate limit headers
+            if "anthropic-ratelimit-limit" in response_headers:
+                try:
+                    interaction.ratelimit_limit = int(response_headers["anthropic-ratelimit-limit"])
+                except ValueError:
+                    pass
+            if "anthropic-ratelimit-remaining" in response_headers:
+                try:
+                    interaction.ratelimit_remaining = int(response_headers["anthropic-ratelimit-remaining"])
+                except ValueError:
+                    pass
+            if "anthropic-ratelimit-reset" in response_headers:
+                try:
+                    # Reset time might be Unix timestamp or seconds
+                    reset_value = response_headers["anthropic-ratelimit-reset"]
+                    interaction.ratelimit_reset = int(float(reset_value))
+                except (ValueError, TypeError):
+                    pass
+
+        return interaction
 
         return interaction
 

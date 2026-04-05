@@ -110,6 +110,14 @@ class Request(Base):
     time_to_last_token_ms = Column(Integer, nullable=True)    # Time to last token
     avg_token_latency_ms = Column(Integer, nullable=True)     # Average inter-token latency
 
+    # Response headers (captured for rate limiting and debugging)
+    response_headers = Column(Text, nullable=True)  # JSON string of response headers
+    x_request_id = Column(String(255), nullable=True)  # Anthropic request ID
+    ratelimit_limit = Column(Integer, nullable=True)  # Rate limit ceiling
+    ratelimit_remaining = Column(Integer, nullable=True)  # Remaining requests
+    ratelimit_reset = Column(Integer, nullable=True)  # Unix timestamp for reset
+    anthropic_version = Column(String(50), nullable=True)  # API version
+
     # Relationships
     session = relationship("Session", back_populates="requests")
     tool_calls = relationship("ToolCall", back_populates="request", lazy="dynamic")
@@ -163,6 +171,13 @@ class Request(Base):
             "time_to_first_token_ms": self.time_to_first_token_ms,
             "time_to_last_token_ms": self.time_to_last_token_ms,
             "avg_token_latency_ms": self.avg_token_latency_ms,
+            # Response headers
+            "response_headers": json.loads(self.response_headers) if self.response_headers else None,
+            "x_request_id": self.x_request_id,
+            "ratelimit_limit": self.ratelimit_limit,
+            "ratelimit_remaining": self.ratelimit_remaining,
+            "ratelimit_reset": self.ratelimit_reset,
+            "anthropic_version": self.anthropic_version,
         }
 
 
@@ -174,8 +189,10 @@ class ToolCall(Base):
     request_id = Column(String(255), ForeignKey('requests.request_id'), nullable=False)
     tool_name = Column(String(100), nullable=False, index=True)
     tool_input_json = Column(Text, nullable=True)
-    tool_result = Column(Text, nullable=True)
+    tool_result = Column(Text, nullable=True)  # Tool execution result
     timestamp = Column(DateTime, default=datetime.now)
+    timestamp_start = Column(DateTime, nullable=True)  # Tool call start time
+    timestamp_end = Column(DateTime, nullable=True)  # Tool call end time
     duration_ms = Column(Integer, nullable=True)
 
     # Relationships
@@ -203,6 +220,8 @@ class ToolCall(Base):
             "tool_input": self.get_input(),
             "tool_result": self.tool_result[:500] if self.tool_result else "",
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "timestamp_start": self.timestamp_start.isoformat() if self.timestamp_start else None,
+            "timestamp_end": self.timestamp_end.isoformat() if self.timestamp_end else None,
             "duration_ms": self.duration_ms,
         }
 

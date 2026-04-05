@@ -21,8 +21,8 @@ from analysis.tool_analyzer import ToolAnalyzer
 from analysis.statistics import StatisticsEngine
 
 # Configuration
-USE_VUE = os.environ.get('USE_VUE', 'false').lower() == 'true'
 VUE_DIST_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'vue-dist')
+USE_VUE = os.environ.get('USE_VUE', 'true' if os.path.exists(VUE_DIST_DIR) else 'false').lower() == 'true'
 
 
 def format_datetime(dt) -> str:

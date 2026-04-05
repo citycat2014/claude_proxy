@@ -12,7 +12,7 @@ from sqlalchemy import func, desc, and_, or_
 from sqlalchemy.orm import Session as DBSession, sessionmaker, joinedload
 
 from storage.models import (
-    engine, Session, Request, ToolCall, Message, Statistics, SystemReminder
+    engine, Session, Request, ToolCall, Message, Statistics, SystemReminder, UrlFilter
 )
 
 # Create session factory
@@ -185,8 +185,8 @@ class Database:
 
     # ============ Statistics operations ============
 
-    def get_statistics_summary(self, hours: int = None) -> Dict[str, Any]:
-        """Get overall statistics summary."""
+    def get_statistics_summary(self, hours: int = None, models: list = None) -> Dict[str, Any]:
+        """Get overall statistics summary with optional model filter."""
         with self.db_session() as db:
             query = db.query(
                 func.count(Request.id).label('total_requests'),
@@ -201,6 +201,9 @@ class Database:
             if hours:
                 since = datetime.now() - timedelta(hours=hours)
                 query = query.filter(Request.timestamp >= since)
+
+            if models:
+                query = query.filter(Request.model.in_(models))
 
             result = query.first()
 
@@ -222,28 +225,34 @@ class Database:
                 "avg_response_time_ms": result.avg_response_time_ms or 0.0,
             }
 
-    def get_today_stats(self) -> Dict[str, Any]:
-        """Get today's statistics."""
+    def get_today_stats(self, models: list = None) -> Dict[str, Any]:
+        """Get today's statistics with optional model filter."""
         with self.db_session() as db:
             today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-            result = db.query(
+            query = db.query(
                 func.count(Request.id).label('requests'),
                 func.sum(Request.cost).label('cost')
-            ).filter(Request.timestamp >= today).first()
+            ).filter(Request.timestamp >= today)
+
+            if models:
+                query = query.filter(Request.model.in_(models))
+
+            result = query.first()
 
             return {
                 "requests": result.requests or 0,
                 "cost": result.cost or 0.0
             }
 
-    def get_timeline_stats(self, days: int = None, hours: int = None, minutes: int = None) -> List[Dict[str, Any]]:
-        """Get request volume with configurable granularity.
+    def get_timeline_stats(self, days: int = None, hours: int = None, minutes: int = None, models: list = None) -> List[Dict[str, Any]]:
+        """Get request volume with configurable granularity and optional model filter.
 
         Args:
             days: Number of days for daily granularity
             hours: Number of hours for hourly granularity
             minutes: Number of minutes for minute granularity
+            models: Optional list of models to filter by
 
         Returns:
             List of dicts with date/timestamp and count
@@ -267,21 +276,29 @@ class Database:
 
             if time_format:
                 # Hourly or minute granularity
-                results = db.query(
+                query = db.query(
                     func.strftime(time_format, Request.timestamp).label(label),
                     func.count(Request.id).label('count')
-                ).filter(Request.timestamp >= since)\
-                    .group_by(func.strftime(time_format, Request.timestamp))\
+                ).filter(Request.timestamp >= since)
+
+                if models:
+                    query = query.filter(Request.model.in_(models))
+
+                results = query.group_by(func.strftime(time_format, Request.timestamp))\
                     .order_by(func.strftime(time_format, Request.timestamp))\
                     .all()
                 return [{label: r[0], "count": r[1]} for r in results]
             else:
                 # Daily granularity
-                results = db.query(
+                query = db.query(
                     func.date(Request.timestamp).label(label),
                     func.count(Request.id).label('count')
-                ).filter(Request.timestamp >= since)\
-                    .group_by(func.date(Request.timestamp))\
+                ).filter(Request.timestamp >= since)
+
+                if models:
+                    query = query.filter(Request.model.in_(models))
+
+                results = query.group_by(func.date(Request.timestamp))\
                     .order_by(func.date(Request.timestamp))\
                     .all()
                 return [{label: str(r.date), "count": r.count} for r in results]
@@ -398,8 +415,8 @@ class Database:
 
     # ============ Analysis module compatibility ============
 
-    def get_tool_usage_stats_with_time_filter(self, hours: int = None) -> List[Dict[str, Any]]:
-        """Get tool usage stats with optional time filter (for ToolAnalyzer)."""
+    def get_tool_usage_stats_with_time_filter(self, hours: int = None, models: list = None) -> List[Dict[str, Any]]:
+        """Get tool usage stats with optional time and model filter (for ToolAnalyzer)."""
         with self.db_session() as db:
             query = db.query(
                 ToolCall.tool_name,
@@ -410,6 +427,11 @@ class Database:
             if hours:
                 since = datetime.now() - timedelta(hours=hours)
                 query = query.filter(ToolCall.timestamp >= since)
+
+            if models:
+                # Join with Request to filter by model
+                query = query.join(Request, ToolCall.request_id == Request.request_id)
+                query = query.filter(Request.model.in_(models))
 
             results = query.group_by(ToolCall.tool_name).all()
 
@@ -488,8 +510,8 @@ class Database:
 
     # ============ Timing statistics ============
 
-    def get_timing_statistics(self, hours: Optional[int] = None) -> Dict[str, Any]:
-        """Get timing statistics for requests."""
+    def get_timing_statistics(self, hours: Optional[int] = None, models: list = None) -> Dict[str, Any]:
+        """Get timing statistics for requests with optional model filter."""
         with self.db_session() as db:
             query = db.query(
                 func.avg(Request.connect_ms).label('avg_connect_ms'),
@@ -506,6 +528,9 @@ class Database:
                 since = datetime.now() - timedelta(hours=hours)
                 query = query.filter(Request.timestamp >= since)
 
+            if models:
+                query = query.filter(Request.model.in_(models))
+
             result = query.first()
 
             return {
@@ -519,14 +544,17 @@ class Database:
                 "avg_response_time_ms": result.avg_response_time_ms or 0,
             }
 
-    def get_response_time_percentiles(self, hours: Optional[int] = None) -> Dict[str, float]:
-        """Get response time percentiles (P50, P95, P99)."""
+    def get_response_time_percentiles(self, hours: Optional[int] = None, models: list = None) -> Dict[str, float]:
+        """Get response time percentiles (P50, P95, P99) with optional model filter."""
         with self.db_session() as db:
             query = db.query(Request.response_time_ms)
 
             if hours:
                 since = datetime.now() - timedelta(hours=hours)
                 query = query.filter(Request.timestamp >= since)
+
+            if models:
+                query = query.filter(Request.model.in_(models))
 
             results = query.all()
             times = [r[0] for r in results if r[0] is not None]
@@ -547,8 +575,8 @@ class Database:
                 "p99": percentile(99),
             }
 
-    def get_timing_breakdown_by_model(self, hours: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Get timing breakdown grouped by model."""
+    def get_timing_breakdown_by_model(self, hours: Optional[int] = None, models: list = None) -> List[Dict[str, Any]]:
+        """Get timing breakdown grouped by model with optional model filter."""
         with self.db_session() as db:
             query = db.query(
                 Request.model,
@@ -563,6 +591,9 @@ class Database:
             if hours:
                 since = datetime.now() - timedelta(hours=hours)
                 query = query.filter(Request.timestamp >= since)
+
+            if models:
+                query = query.filter(Request.model.in_(models))
 
             results = query.group_by(Request.model).all()
 
@@ -637,4 +668,197 @@ class Database:
                 "unique_size_bytes": unique_content_size,
                 "savings_bytes": int(savings_bytes),
                 "savings_percent": round(savings_percent, 2),
+            }
+
+    # ============ URL Filter CRUD ============
+
+    def get_url_filters(self, enabled_only: bool = False) -> List[UrlFilter]:
+        """Get all URL filters, optionally only enabled ones."""
+        with self.db_session() as db:
+            query = db.query(UrlFilter)
+            if enabled_only:
+                query = query.filter(UrlFilter.is_enabled == True)
+            return query.order_by(UrlFilter.priority.asc()).all()
+
+    def add_url_filter(self, filter_data: Dict[str, Any]) -> UrlFilter:
+        """Add a new URL filter."""
+        with self.db_session() as db:
+            filter_rule = UrlFilter(
+                name=filter_data.get('name', ''),
+                pattern=filter_data.get('pattern', ''),
+                filter_type=filter_data.get('filter_type', 'domain'),
+                action=filter_data.get('action', 'include'),
+                priority=filter_data.get('priority', 100),
+                is_enabled=filter_data.get('is_enabled', True),
+            )
+            db.add(filter_rule)
+            db.commit()
+            db.refresh(filter_rule)
+            return filter_rule
+
+    def update_url_filter(self, filter_id: int, filter_data: Dict[str, Any]) -> Optional[UrlFilter]:
+        """Update an existing URL filter."""
+        with self.db_session() as db:
+            filter_rule = db.query(UrlFilter).filter_by(id=filter_id).first()
+            if not filter_rule:
+                return None
+
+            for key, value in filter_data.items():
+                if hasattr(filter_rule, key):
+                    setattr(filter_rule, key, value)
+
+            db.commit()
+            db.refresh(filter_rule)
+            return filter_rule
+
+    def delete_url_filter(self, filter_id: int) -> bool:
+        """Delete a URL filter."""
+        with self.db_session() as db:
+            filter_rule = db.query(UrlFilter).filter_by(id=filter_id).first()
+            if not filter_rule:
+                return False
+            db.delete(filter_rule)
+            db.commit()
+            return True
+
+    def check_url_allowed(self, url: str) -> bool:
+        """Check if URL should be captured based on filter rules."""
+        import re
+        import fnmatch
+
+        filters = self.get_url_filters(enabled_only=True)
+
+        for filter_rule in sorted(filters, key=lambda f: f.priority):
+            matched = False
+
+            if filter_rule.filter_type == 'domain':
+                matched = filter_rule.pattern.lower() in url.lower()
+            elif filter_rule.filter_type == 'path':
+                matched = filter_rule.pattern in url
+            elif filter_rule.filter_type == 'exact':
+                matched = url == filter_rule.pattern
+            elif filter_rule.filter_type == 'wildcard':
+                matched = fnmatch.fnmatch(url, filter_rule.pattern)
+            elif filter_rule.filter_type == 'regex':
+                try:
+                    matched = bool(re.search(filter_rule.pattern, url))
+                except re.error:
+                    continue
+
+            if matched:
+                return filter_rule.action == 'include'
+
+        # Default: deny if no matching filter
+        return False
+
+    def test_url_filter(self, pattern: str, filter_type: str, url: str) -> bool:
+        """Test if a URL matches a filter pattern without saving."""
+        import re
+        import fnmatch
+
+        if filter_type == 'domain':
+            return pattern.lower() in url.lower()
+        elif filter_type == 'path':
+            return pattern in url
+        elif filter_type == 'exact':
+            return url == pattern
+        elif filter_type == 'wildcard':
+            return fnmatch.fnmatch(url, filter_pattern)
+        elif filter_type == 'regex':
+            try:
+                return bool(re.search(pattern, url))
+            except re.error:
+                return False
+        return False
+
+    # ============ Success Rate Statistics ============
+
+    def get_success_rate_stats(self, hours: Optional[int] = None, models: list = None) -> Dict[str, Any]:
+        """
+        Get success rate statistics for requests with optional model filter.
+
+        Success is defined as response_status in 200-299 range.
+        Only counts requests that match URL filter rules.
+
+        Args:
+            hours: Optional time filter (last N hours)
+            models: Optional list of models to filter by
+
+        Returns:
+            Dict with total_requests, successful_requests, failed_requests, success_rate
+        """
+        import re
+        import fnmatch
+
+        with self.db_session() as db:
+            # Get all enabled include filters
+            filters = db.query(UrlFilter).filter(
+                UrlFilter.is_enabled == True,
+                UrlFilter.action == 'include'
+            ).order_by(UrlFilter.priority.asc()).all()
+
+            # Build filter conditions for URL matching
+            # We need to check request_body for the actual URL since Request doesn't have a url column
+            # The URL is typically in the request_body as part of the proxy capture
+
+            # Get base query
+            query = db.query(
+                func.count(Request.id).label('total'),
+                func.count(Request.id).filter(
+                    Request.response_status.between(200, 299)
+                ).label('successful')
+            )
+
+            if hours:
+                since = datetime.now() - timedelta(hours=hours)
+                query = query.filter(Request.timestamp >= since)
+
+            if models:
+                query = query.filter(Request.model.in_(models))
+
+            # Execute query
+            result = query.first()
+            total = result.total or 0
+            successful = result.successful or 0
+            failed = total - successful
+
+            # Calculate success rate
+            success_rate = (successful / total * 100) if total > 0 else 0
+
+            # Get breakdown by status code ranges
+            from sqlalchemy import case
+            status_breakdown = db.query(
+                case(
+                    (Request.response_status.between(200, 299), '2xx'),
+                    (Request.response_status.between(300, 399), '3xx'),
+                    (Request.response_status.between(400, 499), '4xx'),
+                    (Request.response_status.between(500, 599), '5xx'),
+                    else_='other'
+                ).label('status_range'),
+                func.count(Request.id).label('count')
+            )
+
+            if hours:
+                since = datetime.now() - timedelta(hours=hours)
+                status_breakdown = status_breakdown.filter(Request.timestamp >= since)
+
+            if models:
+                status_breakdown = status_breakdown.filter(Request.model.in_(models))
+
+            status_breakdown = status_breakdown.group_by('status_range').all()
+
+            breakdown = {r.status_range: r.count for r in status_breakdown}
+
+            return {
+                "total_requests": total,
+                "successful_requests": successful,
+                "failed_requests": failed,
+                "success_rate": round(success_rate, 2),
+                "breakdown": {
+                    "2xx": breakdown.get('2xx', 0),
+                    "3xx": breakdown.get('3xx', 0),
+                    "4xx": breakdown.get('4xx', 0),
+                    "5xx": breakdown.get('5xx', 0),
+                    "other": breakdown.get('other', 0)
+                }
             }

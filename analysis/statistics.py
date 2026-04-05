@@ -30,10 +30,10 @@ class StatisticsEngine:
     def __init__(self, db):
         self.db = db
 
-    def get_summary(self, hours: Optional[int] = None) -> SummaryStats:
-        """Get overall summary statistics with optional time filter."""
-        stats = self.db.get_statistics_summary(hours)
-        today_stats = self.db.get_today_stats()
+    def get_summary(self, hours: Optional[int] = None, models: Optional[List[str]] = None) -> SummaryStats:
+        """Get overall summary statistics with optional time and model filter."""
+        stats = self.db.get_statistics_summary(hours=hours, models=models)
+        today_stats = self.db.get_today_stats(models=models)
 
         return SummaryStats(
             total_requests=stats.get("total_requests", 0),
@@ -48,18 +48,18 @@ class StatisticsEngine:
             cost_today=today_stats.get("cost", 0),
         )
 
-    def get_request_volume_timeline(self, hours: Optional[float] = None, days: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_request_volume_timeline(self, hours: Optional[float] = None, days: Optional[int] = None, models: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """Get request volume over time with optional filter."""
         if hours and hours <= 1:
             # Use minute-level grouping for very short time ranges (< 1 hour)
-            return self.db.get_timeline_stats(minutes=int(hours * 60))
+            return self.db.get_timeline_stats(minutes=int(hours * 60), models=models)
         elif hours:
             # Use hourly grouping for short time ranges
-            return self.db.get_timeline_stats(hours=int(hours))
+            return self.db.get_timeline_stats(hours=int(hours), models=models)
         elif days:
-            return self.db.get_timeline_stats(days=days)
+            return self.db.get_timeline_stats(days=days, models=models)
         else:
-            return self.db.get_timeline_stats(days=7)
+            return self.db.get_timeline_stats(days=7, models=models)
 
     def get_cost_timeline(self, hours: Optional[int] = None, days: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get cost over time with optional filter."""
@@ -94,10 +94,10 @@ class StatisticsEngine:
         # Placeholder
         return {i: 0 for i in range(24)}
 
-    def get_response_time_stats(self, hours: Optional[int] = None) -> Dict[str, float]:
-        """Get response time statistics."""
-        stats = self.db.get_timing_statistics(hours)
-        percentiles = self.db.get_response_time_percentiles(hours)
+    def get_response_time_stats(self, hours: Optional[int] = None, models: Optional[List[str]] = None) -> Dict[str, float]:
+        """Get response time statistics with optional model filter."""
+        stats = self.db.get_timing_statistics(hours=hours, models=models)
+        percentiles = self.db.get_response_time_percentiles(hours=hours, models=models)
 
         return {
             "avg_ms": stats.get("avg_response_time_ms", 0),
@@ -108,19 +108,19 @@ class StatisticsEngine:
             "p99_ms": percentiles.get("p99", 0),
         }
 
-    def get_timing_breakdown(self, hours: Optional[int] = None) -> Dict[str, Any]:
-        """Get detailed timing breakdown."""
-        stats = self.db.get_timing_statistics(hours)
-        by_model = self.db.get_timing_breakdown_by_model(hours)
+    def get_timing_breakdown(self, hours: Optional[int] = None, models: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Get detailed timing breakdown with optional model filter."""
+        stats = self.db.get_timing_statistics(hours=hours, models=models)
+        by_model = self.db.get_timing_breakdown_by_model(hours=hours, models=models)
 
         return {
             "overall": stats,
             "by_model": by_model,
         }
 
-    def get_streaming_latency_stats(self, hours: Optional[int] = None) -> Dict[str, Any]:
-        """Get streaming-specific latency statistics."""
-        stats = self.db.get_timing_statistics(hours)
+    def get_streaming_latency_stats(self, hours: Optional[int] = None, models: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Get streaming-specific latency statistics with optional model filter."""
+        stats = self.db.get_timing_statistics(hours=hours, models=models)
 
         return {
             "avg_time_to_first_token_ms": stats.get("avg_time_to_first_token_ms", 0),

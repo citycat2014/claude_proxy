@@ -23,12 +23,15 @@ export const useStatisticsStore = defineStore('statistics', {
   },
 
   actions: {
-    async fetchSummary(hours = null) {
+    async fetchSummary(hours = null, models = []) {
       this.loading = true
       this.error = null
       try {
-        const params = hours !== null && hours !== undefined ? `?hours=${hours}` : ''
-        const response = await fetch(`/api/statistics/summary${params}`)
+        const params = new URLSearchParams()
+        if (hours !== null && hours !== undefined) params.append('hours', hours.toString())
+        if (models && models.length > 0) params.append('models', models.join(','))
+
+        const response = await fetch(`/api/statistics/summary?${params.toString()}`)
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         this.summary = await response.json()
       } catch (err) {

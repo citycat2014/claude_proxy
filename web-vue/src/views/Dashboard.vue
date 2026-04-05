@@ -1,21 +1,108 @@
 <template>
   <div>
-    <!-- Time Filter Bar -->
-    <div class="filter-bar" style="margin-bottom: 20px; padding: 12px 16px; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 16px;">
-      <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Time Range:</span>
-      <select
-        v-model="timeFilter"
-        @change="onTimeFilterChange"
-        style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 150px; cursor: pointer;"
-      >
-        <option :value="0.5">Last 30 Minutes</option>
-        <option :value="1">Last 1 Hour</option>
-        <option :value="5">Last 5 Hours</option>
-        <option :value="24">Last 24 Hours</option>
-        <option :value="168">Last 7 Days</option>
-        <option :value="720">Last 30 Days</option>
-        <option :value="null">All Time</option>
-      </select>
+    <!-- Filter Bar -->
+    <div class="filter-bar" style="margin-bottom: 20px; padding: 12px 16px; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 24px;">
+      <!-- Time Filter -->
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Time Range:</span>
+        <select
+          v-model="timeFilter"
+          @change="onTimeFilterChange"
+          style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 150px; cursor: pointer;"
+        >
+          <option :value="0.5">Last 30 Minutes</option>
+          <option :value="1">Last 1 Hour</option>
+          <option :value="5">Last 5 Hours</option>
+          <option :value="24">Last 24 Hours</option>
+          <option :value="168">Last 7 Days</option>
+          <option :value="720">Last 30 Days</option>
+          <option :value="null">All Time</option>
+        </select>
+      </div>
+
+      <!-- Model Filter -->
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Model:</span>
+        <div class="model-filter-wrapper" style="position: relative;">
+          <div
+            class="model-filter-trigger"
+            :class="{ active: isModelDropdownOpen }"
+            @click="toggleModelDropdown"
+            style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-primary); color: var(--text-primary); font-size: 13px; min-width: 180px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;"
+          >
+            <span>{{ modelFilterText }}</span>
+            <i class="bi bi-chevron-down" :style="{ transform: isModelDropdownOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }"></i>
+          </div>
+
+          <!-- Model Dropdown -->
+          <div
+            v-if="isModelDropdownOpen"
+            class="model-dropdown"
+            style="position: absolute; top: calc(100% + 4px); left: 0; min-width: 260px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius); box-shadow: 0 10px 40px rgba(0,0,0,0.15); z-index: 100;"
+          >
+            <!-- Search -->
+            <div style="padding: 12px; border-bottom: 1px solid var(--border-color);">
+              <input
+                v-model="modelSearchQuery"
+                type="text"
+                placeholder="Search models..."
+                style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px;"
+                @click.stop
+              >
+            </div>
+
+            <!-- Actions -->
+            <div style="display: flex; padding: 8px 12px; gap: 8px; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary);">
+              <button
+                class="action-btn"
+                @click="selectAllModels"
+                style="padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); font-size: 11px; color: var(--text-secondary); cursor: pointer;"
+              >Select All</button>
+              <button
+                class="action-btn"
+                @click="clearModelSelection"
+                style="padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); font-size: 11px; color: var(--text-secondary); cursor: pointer;"
+              >Clear</button>
+            </div>
+
+            <!-- Model List -->
+            <div style="max-height: 200px; overflow-y: auto; padding: 4px 0;">
+              <div
+                v-for="model in filteredModels"
+                :key="model"
+                class="model-item"
+                :class="{ selected: selectedModels.includes(model) }"
+                @click="toggleModel(model)"
+                style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; transition: background 0.15s;"
+                :style="{ background: selectedModels.includes(model) ? 'rgba(99, 102, 241, 0.08)' : 'transparent' }"
+              >
+                <div
+                  class="checkbox"
+                  :style="{
+                    width: '16px',
+                    height: '16px',
+                    border: '2px solid var(--border-color)',
+                    borderRadius: '3px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: selectedModels.includes(model) ? 'var(--primary)' : 'transparent',
+                    borderColor: selectedModels.includes(model) ? 'var(--primary)' : 'var(--border-color)'
+                  }"
+                >
+                  <i v-if="selectedModels.includes(model)" class="bi bi-check" style="color: white; font-size: 10px;"></i>
+                </div>
+                <span style="font-size: 13px; color: var(--text-primary);">{{ model }}</span>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 8px 12px; border-top: 1px solid var(--border-color); background: var(--bg-secondary); font-size: 11px; color: var(--text-secondary); text-align: center;">
+              {{ availableModels.length }} models available
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Stats Grid -->
@@ -68,6 +155,27 @@
         </div>
         <div class="stat-value">{{ formatCost(stats.totalCost) }}</div>
         <div class="stat-subtitle">Today: {{ formatCost(stats.costToday) }}</div>
+      </div>
+
+      <!-- Success Rate Card -->
+      <div class="stat-card">
+        <div class="stat-header">
+          <span class="stat-label">API Success Rate</span>
+          <div class="stat-icon" :class="successRateClass">
+            <i class="bi" :class="successRateIcon"></i>
+          </div>
+        </div>
+        <div class="stat-value" :style="{ color: successRateColor }">{{ successRateStats.success_rate }}%</div>
+        <div class="stat-subtitle">
+          {{ formatNumber(successRateStats.successful_requests) }} / {{ formatNumber(successRateStats.total_requests) }} successful
+        </div>
+        <div class="stat-subtitle" style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+          <span v-if="successRateStats.breakdown" title="2xx Success | 4xx Client Error | 5xx Server Error">
+            <span style="color: var(--success)">2xx: {{ successRateStats.breakdown['2xx'] || 0 }}</span> |
+            <span style="color: var(--warning)">4xx: {{ successRateStats.breakdown['4xx'] || 0 }}</span> |
+            <span style="color: var(--danger)">5xx: {{ successRateStats.breakdown['5xx'] || 0 }}</span>
+          </span>
+        </div>
       </div>
     </div>
 
@@ -191,7 +299,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import Chart from 'chart.js/auto'
 import { useStatisticsStore } from '@/stores/statistics'
 import { useChartsStore } from '@/stores/charts'
@@ -208,6 +316,10 @@ const modelsChart = ref(null)
 const toolsChart = ref(null)
 const timingChart = ref(null)
 
+// Model filter state
+const isModelDropdownOpen = ref(false)
+const modelSearchQuery = ref('')
+
 let requestsChartInstance = null
 let modelsChartInstance = null
 let toolsChartInstance = null
@@ -215,6 +327,23 @@ let timingChartInstance = null
 let lastTimeFilter = null
 
 const stats = computed(() => statsStore)
+const availableModels = computed(() => chartsStore.availableModels)
+const selectedModels = computed({
+  get: () => chartsStore.selectedModels,
+  set: (value) => chartsStore.setSelectedModels(value)
+})
+
+const filteredModels = computed(() => {
+  if (!modelSearchQuery.value) return availableModels.value
+  const query = modelSearchQuery.value.toLowerCase()
+  return availableModels.value.filter(model => model.toLowerCase().includes(query))
+})
+
+const modelFilterText = computed(() => {
+  if (selectedModels.value.length === 0) return 'All Models'
+  if (selectedModels.value.length === 1) return selectedModels.value[0]
+  return `${selectedModels.value.length} models selected`
+})
 const toolStats = ref([])
 const timingStats = ref({ avg_ms: 0, p50_ms: 0, p95_ms: 0, p99_ms: 0 })
 const timingBreakdown = ref({
@@ -229,6 +358,34 @@ const streamingStats = ref({
   avg_token_latency_ms: 0
 })
 const recentSessions = ref([])
+const successRateStats = ref({
+  total_requests: 0,
+  successful_requests: 0,
+  failed_requests: 0,
+  success_rate: 0,
+  breakdown: { '2xx': 0, '4xx': 0, '5xx': 0 }
+})
+
+const successRateClass = computed(() => {
+  const rate = successRateStats.value.success_rate || 0
+  if (rate >= 95) return 'success'
+  if (rate >= 80) return 'warning'
+  return 'danger'
+})
+
+const successRateIcon = computed(() => {
+  const rate = successRateStats.value.success_rate || 0
+  if (rate >= 95) return 'bi-check-circle-fill'
+  if (rate >= 80) return 'bi-exclamation-circle-fill'
+  return 'bi-x-circle-fill'
+})
+
+const successRateColor = computed(() => {
+  const rate = successRateStats.value.success_rate || 0
+  if (rate >= 95) return 'var(--success)'
+  if (rate >= 80) return 'var(--warning)'
+  return 'var(--danger)'
+})
 
 const chartSubtitle = computed(() => {
   if (timeFilter.value === 720) return 'Last 30 days'
@@ -245,23 +402,58 @@ function onTimeFilterChange() {
   loadDashboardData()
 }
 
-async function loadDashboardData() {
-  // Load summary
-  await statsStore.fetchSummary(timeFilter.value)
+// Model filter functions
+function toggleModelDropdown() {
+  isModelDropdownOpen.value = !isModelDropdownOpen.value
+}
 
-  // Load timeline based on time filter
-  if (timeFilter.value === 720) {
-    // 30 days
-    await chartsStore.fetchTimeline(null, 30)
-  } else if (timeFilter.value === 168) {
-    // 7 days
-    await chartsStore.fetchTimeline(null, 7)
-  } else if (timeFilter.value) {
-    // Hours-based filter
-    await chartsStore.fetchTimeline(timeFilter.value, null)
+function toggleModel(model) {
+  const index = selectedModels.value.indexOf(model)
+  if (index > -1) {
+    selectedModels.value = selectedModels.value.filter(m => m !== model)
   } else {
-    // All Time - default to 7 days
-    await chartsStore.fetchTimeline(null, 7)
+    selectedModels.value = [...selectedModels.value, model]
+  }
+  // Reload data with model filter
+  loadDashboardData()
+}
+
+function selectAllModels() {
+  selectedModels.value = [...availableModels.value]
+  loadDashboardData()
+}
+
+function clearModelSelection() {
+  selectedModels.value = []
+  loadDashboardData()
+}
+
+// Close dropdown when clicking outside
+function handleClickOutside(event) {
+  const dropdown = document.querySelector('.model-filter-wrapper')
+  if (dropdown && !dropdown.contains(event.target)) {
+    isModelDropdownOpen.value = false
+  }
+}
+
+async function loadDashboardData() {
+  // Build model filter parameter
+  const modelParam = selectedModels.value.length > 0
+    ? `&models=${selectedModels.value.join(',')}`
+    : ''
+
+  // Load summary with model filter
+  await statsStore.fetchSummary(timeFilter.value, selectedModels.value)
+
+  // Load timeline based on time filter with model filter
+  if (timeFilter.value === 720) {
+    await chartsStore.fetchTimeline(null, 30, selectedModels.value)
+  } else if (timeFilter.value === 168) {
+    await chartsStore.fetchTimeline(null, 7, selectedModels.value)
+  } else if (timeFilter.value) {
+    await chartsStore.fetchTimeline(timeFilter.value, null, selectedModels.value)
+  } else {
+    await chartsStore.fetchTimeline(null, 7, selectedModels.value)
   }
   updateRequestsChart()
 
@@ -269,9 +461,9 @@ async function loadDashboardData() {
   await chartsStore.fetchModelDistribution(timeFilter.value)
   updateModelsChart()
 
-  // Load tool stats
+  // Load tool stats with model filter
   try {
-    const response = await fetch(`/api/statistics/tools?hours=${timeFilter.value || ''}`)
+    const response = await fetch(`/api/statistics/tools?hours=${timeFilter.value || ''}${modelParam}`)
     if (response.ok) {
       toolStats.value = await response.json()
       updateToolsChart()
@@ -284,27 +476,48 @@ async function loadDashboardData() {
   await sessionsStore.fetchSessions(1)
   recentSessions.value = sessionsStore.sessions.slice(0, 5)
 
-  // Load timing statistics
+  // Load timing statistics with model filter
   await loadTimingData()
+
+  // Load success rate statistics with model filter
+  await loadSuccessRateData()
+}
+
+async function loadSuccessRateData() {
+  try {
+    const modelParam = selectedModels.value.length > 0
+      ? `&models=${selectedModels.value.join(',')}`
+      : ''
+    const response = await fetch(`/api/statistics/success-rate?hours=${timeFilter.value || ''}${modelParam}`)
+    if (response.ok) {
+      successRateStats.value = await response.json()
+    }
+  } catch (err) {
+    console.error('Failed to load success rate data:', err)
+  }
 }
 
 async function loadTimingData() {
   try {
+    const modelParam = selectedModels.value.length > 0
+      ? `&models=${selectedModels.value.join(',')}`
+      : ''
+
     // Load latency stats
-    const latencyResponse = await fetch(`/api/statistics/latency?hours=${timeFilter.value || ''}`)
+    const latencyResponse = await fetch(`/api/statistics/latency?hours=${timeFilter.value || ''}${modelParam}`)
     if (latencyResponse.ok) {
       timingStats.value = await latencyResponse.json()
     }
 
     // Load timing breakdown
-    const timingResponse = await fetch(`/api/statistics/timing?hours=${timeFilter.value || ''}`)
+    const timingResponse = await fetch(`/api/statistics/timing?hours=${timeFilter.value || ''}${modelParam}`)
     if (timingResponse.ok) {
       const timing = await timingResponse.json()
       timingBreakdown.value = timing.overall || {}
     }
 
     // Load streaming stats
-    const streamingResponse = await fetch(`/api/statistics/streaming?hours=${timeFilter.value || ''}`)
+    const streamingResponse = await fetch(`/api/statistics/streaming?hours=${timeFilter.value || ''}${modelParam}`)
     if (streamingResponse.ok) {
       streamingStats.value = await streamingResponse.json()
     }
@@ -520,12 +733,20 @@ function updateTimingChart() {
 
 onMounted(() => {
   loadDashboardData()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 
 watch(() => chartsStore.timelineData, updateRequestsChart)
 watch(() => chartsStore.modelDistribution, updateModelsChart)
 watch(() => toolStats.value, updateToolsChart)
-watch(() => timeFilter.value, loadTimingData)
+watch(() => timeFilter.value, () => {
+  loadTimingData()
+  loadSuccessRateData()
+})
 </script>
 
 <style scoped>

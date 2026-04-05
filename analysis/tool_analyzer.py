@@ -48,9 +48,9 @@ class ToolAnalyzer:
     def __init__(self, db):
         self.db = db
 
-    def get_tool_usage_stats(self, hours: Optional[int] = None) -> List[ToolStats]:
-        """Get usage statistics for all tools with optional time filter."""
-        stats = self.db.get_tool_usage_stats_with_time_filter(hours)
+    def get_tool_usage_stats(self, hours: Optional[int] = None, models: Optional[List[str]] = None) -> List[ToolStats]:
+        """Get usage statistics for all tools with optional time and model filter."""
+        stats = self.db.get_tool_usage_stats_with_time_filter(hours=hours, models=models)
 
         result = []
         for stat in stats:

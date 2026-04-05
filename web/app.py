@@ -206,9 +206,11 @@ def serve_vue_assets(filename):
 
 @app.route("/api/statistics/summary")
 def api_statistics_summary():
-    """Get summary statistics with optional time filter."""
+    """Get summary statistics with optional time and model filter."""
     hours = request.args.get("hours", None, type=float)
-    summary = stats_engine.get_summary(hours=hours)
+    models = request.args.get("models", None)
+    model_list = models.split(",") if models else None
+    summary = stats_engine.get_summary(hours=hours, models=model_list)
     return jsonify({
         "total_requests": summary.total_requests,
         "total_sessions": summary.total_sessions,
@@ -225,10 +227,12 @@ def api_statistics_summary():
 
 @app.route("/api/statistics/timeline")
 def api_statistics_timeline():
-    """Get timeline statistics with optional time filter."""
+    """Get timeline statistics with optional time and model filter."""
     hours = request.args.get("hours", None, type=float)
     days = request.args.get("days", None, type=int)
-    timeline = stats_engine.get_request_volume_timeline(hours=hours, days=days)
+    models = request.args.get("models", None)
+    model_list = models.split(",") if models else None
+    timeline = stats_engine.get_request_volume_timeline(hours=hours, days=days, models=model_list)
     return jsonify(timeline)
 
 
@@ -242,9 +246,11 @@ def api_statistics_models():
 
 @app.route("/api/statistics/tools")
 def api_statistics_tools():
-    """Get tool usage statistics with optional time filter."""
+    """Get tool usage statistics with optional time and model filter."""
     hours = request.args.get("hours", None, type=float)
-    stats = tool_analyzer.get_tool_usage_stats(hours=hours)
+    models = request.args.get("models", None)
+    model_list = models.split(",") if models else None
+    stats = tool_analyzer.get_tool_usage_stats(hours=hours, models=model_list)
     return jsonify([
         {
             "name": s.name,
@@ -257,23 +263,38 @@ def api_statistics_tools():
 
 @app.route("/api/statistics/timing")
 def api_statistics_timing():
-    """Get detailed timing statistics."""
+    """Get detailed timing statistics with optional model filter."""
     hours = request.args.get("hours", None, type=int)
-    return jsonify(stats_engine.get_timing_breakdown(hours=hours))
+    models = request.args.get("models", None)
+    model_list = models.split(",") if models else None
+    return jsonify(stats_engine.get_timing_breakdown(hours=hours, models=model_list))
 
 
 @app.route("/api/statistics/latency")
 def api_statistics_latency():
-    """Get response time latency statistics (P50, P95, P99)."""
+    """Get response time latency statistics (P50, P95, P99) with optional model filter."""
     hours = request.args.get("hours", None, type=int)
-    return jsonify(stats_engine.get_response_time_stats(hours=hours))
+    models = request.args.get("models", None)
+    model_list = models.split(",") if models else None
+    return jsonify(stats_engine.get_response_time_stats(hours=hours, models=model_list))
 
 
 @app.route("/api/statistics/streaming")
 def api_statistics_streaming():
-    """Get streaming-specific latency statistics."""
+    """Get streaming-specific latency statistics with optional model filter."""
     hours = request.args.get("hours", None, type=int)
-    return jsonify(stats_engine.get_streaming_latency_stats(hours=hours))
+    models = request.args.get("models", None)
+    model_list = models.split(",") if models else None
+    return jsonify(stats_engine.get_streaming_latency_stats(hours=hours, models=model_list))
+
+
+@app.route("/api/statistics/success-rate")
+def api_statistics_success_rate():
+    """Get API success rate statistics (2xx vs non-2xx) with optional model filter."""
+    hours = request.args.get("hours", None, type=int)
+    models = request.args.get("models", None)
+    model_list = models.split(",") if models else None
+    return jsonify(db.get_success_rate_stats(hours=hours, models=model_list))
 
 
 @app.route("/api/sessions")
@@ -423,6 +444,124 @@ def api_export_session(session_id):
         "session": serialize_session(session),
         "requests": [serialize_request(req) for req in requests],
     })
+
+
+# ============================================================================
+# URL Filter API
+# ============================================================================
+
+@app.route("/api/url-filters", methods=["GET"])
+def api_url_filters_list():
+    """Get all URL filters."""
+    filters = db.get_url_filters(enabled_only=False)
+    return jsonify([f.to_dict() for f in filters])
+
+
+@app.route("/api/url-filters/<int:filter_id>", methods=["GET"])
+def api_url_filters_get(filter_id):
+    """Get a specific URL filter."""
+    from storage.models import UrlFilter
+    with db.db_session() as session:
+        filter_rule = session.query(UrlFilter).filter_by(id=filter_id).first()
+        if not filter_rule:
+            return jsonify({"error": "Filter not found"}), 404
+        return jsonify(filter_rule.to_dict())
+
+
+@app.route("/api/url-filters", methods=["POST"])
+def api_url_filters_create():
+    """Create a new URL filter."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    required = ['name', 'pattern']
+    for field in required:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+
+    try:
+        filter_rule = db.add_url_filter(data)
+        return jsonify(filter_rule.to_dict()), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/url-filters/<int:filter_id>", methods=["PUT"])
+def api_url_filters_update(filter_id):
+    """Update a URL filter."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    filter_rule = db.update_url_filter(filter_id, data)
+    if not filter_rule:
+        return jsonify({"error": "Filter not found"}), 404
+
+    return jsonify(filter_rule.to_dict())
+
+
+@app.route("/api/url-filters/<int:filter_id>", methods=["DELETE"])
+def api_url_filters_delete(filter_id):
+    """Delete a URL filter."""
+    success = db.delete_url_filter(filter_id)
+    if not success:
+        return jsonify({"error": "Filter not found"}), 404
+    return jsonify({"success": True})
+
+
+@app.route("/api/url-filters/test", methods=["POST"])
+def api_url_filters_test():
+    """Test if a URL matches filter patterns."""
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({"error": "URL required"}), 400
+
+    test_url = data['url']
+    pattern = data.get('pattern')
+    filter_type = data.get('filter_type', 'domain')
+
+    if pattern:
+        # Test specific pattern
+        import re
+        import fnmatch
+        matched = False
+
+        if filter_type == 'domain':
+            matched = pattern.lower() in test_url.lower()
+        elif filter_type == 'path':
+            matched = pattern in test_url
+        elif filter_type == 'exact':
+            matched = test_url == pattern
+        elif filter_type == 'wildcard':
+            matched = fnmatch.fnmatch(test_url, pattern)
+        elif filter_type == 'regex':
+            try:
+                matched = bool(re.search(pattern, test_url))
+            except re.error as e:
+                return jsonify({"error": f"Invalid regex: {e}"}), 400
+
+        return jsonify({
+            "url": test_url,
+            "pattern": pattern,
+            "filter_type": filter_type,
+            "matched": matched
+        })
+    else:
+        # Test against current filters
+        allowed = db.check_url_allowed(test_url)
+        return jsonify({
+            "url": test_url,
+            "allowed": allowed
+        })
+
+
+@app.route("/api/url-filters/stats", methods=["GET"])
+def api_url_filters_stats():
+    """Get URL filter statistics."""
+    from proxy.filter_engine import URLFilterEngine
+    engine = URLFilterEngine(db)
+    return jsonify(engine.get_filter_stats())
 
 
 # ============================================================================

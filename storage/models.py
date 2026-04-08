@@ -26,7 +26,7 @@ class Session(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String(255), unique=True, nullable=False, index=True)
-    started_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, default=datetime.now)
     ended_at = Column(DateTime, nullable=True)
     total_requests = Column(Integer, default=0)
     total_input_tokens = Column(Integer, default=0)
@@ -66,7 +66,7 @@ class Request(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     request_id = Column(String(255), unique=True, nullable=False, index=True)
     session_id = Column(String(255), ForeignKey('sessions.session_id'), nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    timestamp = Column(DateTime, default=datetime.now, index=True)
     method = Column(String(20), nullable=True)
     endpoint = Column(String(500), nullable=True)
 

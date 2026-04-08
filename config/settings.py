@@ -95,6 +95,10 @@ DATA_CLEANUP_ENABLED = os.getenv("DATA_CLEANUP_ENABLED", "true").lower() == "tru
 DATA_CLEANUP_INTERVAL_HOURS = int(os.getenv("DATA_CLEANUP_INTERVAL_HOURS", "24"))
 DATA_CLEANUP_BATCH_SIZE = int(os.getenv("DATA_CLEANUP_BATCH_SIZE", "100"))
 
+# Recycle bin settings
+RECYCLE_BIN_ENABLED = os.getenv("RECYCLE_BIN_ENABLED", "true").lower() == "true"
+RECYCLE_BIN_RETENTION_DAYS = int(os.getenv("RECYCLE_BIN_RETENTION_DAYS", "7"))  # Days to keep data in recycle bin
+
 # Claude API settings (from Claude Code config)
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_AUTH_TOKEN") or os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_BASE_URL = os.getenv("ANTHROPIC_BASE_URL", "https://api.anthropic.com")

@@ -601,6 +601,13 @@ class AnthropicCaptureAddon:
                 url = flow.request.url
             else:
                 url = f"https://api.anthropic.com/v1/messages"
+
+            # Build complete response from parsed_response (not raw stream data)
+            if parsed_response:
+                response_for_log = json.dumps(parsed_response.to_dict(), ensure_ascii=False)
+            else:
+                response_for_log = interaction.response_body or ''
+
             extra_data = {
                 'request_id': interaction.request_id,
                 'model': interaction.parsed_request.model,
@@ -612,7 +619,7 @@ class AnthropicCaptureAddon:
             log_manager.log_request(
                 url=url,
                 request_body=interaction.request_body,
-                response_body=interaction.response_body or '',
+                response_body=response_for_log,
                 extra_data=extra_data
             )
 

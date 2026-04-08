@@ -18,6 +18,7 @@ from mitmproxy.http import Headers
 from config.settings import TARGET_DOMAINS, DATABASE_PATH, DATA_CLEANUP_ENABLED, WEB_HOST, WEB_PORT
 from proxy.anthropic_handler import AnthropicHandler, APIInteraction
 from proxy.filter_engine import URLFilterEngine
+from proxy.log_manager import init_log_manager, get_log_manager
 from storage.database import Database
 from storage.models import Session, Request, ToolCall, Message
 from storage.worker import init_worker, enqueue_write, shutdown_worker, get_worker
@@ -27,12 +28,13 @@ from storage.recycle_bin import RecycleBinManager, CleanupLogManager, SettingsMa
 # SocketIO client for real-time WebSocket broadcast
 import socketio
 
-# Configure logging
+# Configure logging - runtime logger will be used via log_manager
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+log_manager = None  # Will be initialized in load()
 
 
 class CaptureState:
@@ -67,14 +69,21 @@ class AnthropicCaptureAddon:
         """Called when the addon is loaded."""
         logger.info("Loading AnthropicCaptureAddon...")
 
+        # Initialize log manager for rotating log files
+        log_manager = init_log_manager()
+        log_manager.log_info("Loading AnthropicCaptureAddon...")
+        logger.info(f"Log manager initialized, logs stored in {log_manager.log_dir}")
+
         # Initialize database
         self.db = Database(DATABASE_PATH)
         logger.info(f"Database initialized at {DATABASE_PATH}")
+        log_manager.log_info(f"Database initialized at {DATABASE_PATH}")
 
         # Initialize settings manager for dynamic configuration
         try:
             self.settings_manager = SettingsManager(self.db)
             logger.info("Settings manager initialized")
+            log_manager.log_info("Settings manager initialized")
         except Exception as e:
             logger.warning(f"Failed to initialize settings manager: {e}")
             self.settings_manager = None
@@ -82,10 +91,12 @@ class AnthropicCaptureAddon:
         # Initialize URL filter engine
         self.filter_engine = URLFilterEngine(self.db)
         logger.info("URL filter engine initialized")
+        log_manager.log_info("URL filter engine initialized")
 
         # Initialize background write worker
         init_worker(self.db, batch_size=10, batch_interval=0.1)
         logger.info("Background write worker initialized")
+        log_manager.log_info("Background write worker initialized")
 
         # Initialize SocketIO client for real-time broadcast
         self._socketio_client: Optional[socketio.SimpleClient] = None
@@ -106,10 +117,12 @@ class AnthropicCaptureAddon:
                         recycle_bin_days = self.settings_manager.get_setting('recycle_bin_retention_days', 7)
                     self.recycle_bin = RecycleBinManager(self.db, retention_days=recycle_bin_days)
                     logger.info(f"Recycle bin manager initialized ({recycle_bin_days} days retention)")
+                    log_manager.log_info(f"Recycle bin manager initialized ({recycle_bin_days} days retention)")
 
                     # Initialize log manager
                     self.log_manager = CleanupLogManager(self.db)
                     logger.info("Cleanup log manager initialized")
+                    log_manager.log_info("Cleanup log manager initialized")
 
                 # Initialize cleanup manager with recycle bin support
                 self.cleanup_manager = DataCleanupManager(
@@ -129,8 +142,10 @@ class AnthropicCaptureAddon:
                 )
                 self.cleanup_scheduler.start()
                 logger.info("Data cleanup scheduler initialized")
+                log_manager.log_info("Data cleanup scheduler initialized")
             except Exception as e:
                 logger.warning(f"Failed to initialize cleanup scheduler: {e}")
+                log_manager.log_warning(f"Failed to initialize cleanup scheduler: {e}")
 
     def _init_socketio_client(self):
         """
@@ -153,12 +168,14 @@ class AnthropicCaptureAddon:
                     client.connect(socketio_url)
                     self._socketio_client = client
                     logger.info(f"SocketIO client connected to {socketio_url} (attempt {attempt + 1})")
+                    log_manager.log_info(f"SocketIO client connected to {socketio_url} (attempt {attempt + 1})")
 
                     # Set up write worker callback
                     worker = get_worker()
                     if worker:
                         worker.on_write_callback = lambda req: self._broadcast_request(req.to_dict())
                         logger.info("Write worker callback configured for SocketIO broadcast")
+                        log_manager.log_info("Write worker callback configured for SocketIO broadcast")
                     return
                 except Exception as e:
                     if attempt < max_retries - 1:
@@ -166,6 +183,7 @@ class AnthropicCaptureAddon:
                         time.sleep(retry_delay)
                     else:
                         logger.warning(f"Failed to connect SocketIO client after {max_retries} attempts: {e}. Real-time updates disabled.")
+                        log_manager.log_warning(f"Failed to connect SocketIO client after {max_retries} attempts: {e}. Real-time updates disabled.")
 
         # Start connection in background thread
         threading.Thread(target=connect_with_retry, daemon=True, name="SocketIOClient").start()
@@ -206,6 +224,10 @@ class AnthropicCaptureAddon:
         # Log all HTTPS requests for debugging
         if flow.request.scheme == "https":
             logger.info(f"[REQUEST] {method} {url}")
+            # Also log to rotating file
+            log_manager = get_log_manager()
+            if log_manager:
+                log_manager.log_debug(f"[REQUEST] {method} {url}")
 
         # Check if URL should be captured based on filter rules
         if not self.filter_engine or not self.filter_engine.should_capture(url):
@@ -237,12 +259,19 @@ class AnthropicCaptureAddon:
             if parsed:
                 flow.metadata["parsed_request"] = parsed
                 logger.info(f"Parsed request: {parsed.request_id} to model={parsed.model}")
+                # Also log to rotating file
+                log_manager = get_log_manager()
+                if log_manager:
+                    log_manager.log_info(f"Parsed request: {parsed.request_id} to model={parsed.model}")
 
                 # Track session
                 self._update_session(parsed)
 
         except Exception as e:
             logger.error(f"Error parsing request: {e}")
+            log_manager = get_log_manager()
+            if log_manager:
+                log_manager.log_error(f"Error parsing request: {e}")
 
     def response(self, flow: http.HTTPFlow) -> None:
         """
@@ -305,6 +334,14 @@ class AnthropicCaptureAddon:
                     f"tokens: {interaction.input_tokens}/{interaction.output_tokens}, "
                     f"cost: ${interaction.cost:.4f}"
                 )
+                # Also log to rotating file
+                log_manager = get_log_manager()
+                if log_manager:
+                    log_manager.log_info(
+                        f"Captured streaming request: {interaction.request_id}, "
+                        f"tokens: {interaction.input_tokens}/{interaction.output_tokens}, "
+                        f"cost: ${interaction.cost:.4f}"
+                    )
             else:
                 # Non-streaming response
                 interaction = self.handler.create_interaction(
@@ -323,9 +360,20 @@ class AnthropicCaptureAddon:
                     f"tokens: {interaction.input_tokens}/{interaction.output_tokens}, "
                     f"cost: ${interaction.cost:.4f}"
                 )
+                # Also log to rotating file
+                log_manager = get_log_manager()
+                if log_manager:
+                    log_manager.log_info(
+                        f"Captured request: {interaction.request_id}, "
+                        f"tokens: {interaction.input_tokens}/{interaction.output_tokens}, "
+                        f"cost: ${interaction.cost:.4f}"
+                    )
 
         except Exception as e:
             logger.error(f"Error processing response: {e}")
+            log_manager = get_log_manager()
+            if log_manager:
+                log_manager.log_error(f"Error processing response: {e}")
 
     def responseheaders(self, flow: http.HTTPFlow) -> None:
         """
@@ -352,6 +400,9 @@ class AnthropicCaptureAddon:
             flow: The HTTP flow with error
         """
         logger.error(f"Flow error: {flow.error}")
+        log_manager = get_log_manager()
+        if log_manager:
+            log_manager.log_error(f"Flow error: {flow.error}")
 
         # Only process tracked requests
         if not flow.metadata.get("is_tracked"):
@@ -394,9 +445,16 @@ class AnthropicCaptureAddon:
                 f"Captured request (with error): {interaction.request_id}, "
                 f"error: {flow.error}"
             )
+            if log_manager:
+                log_manager.log_info(
+                    f"Captured request (with error): {interaction.request_id}, "
+                    f"error: {flow.error}"
+                )
 
         except Exception as e:
             logger.error(f"Error storing failed request: {e}")
+            if log_manager:
+                log_manager.log_error(f"Error storing failed request: {e}")
 
     def _is_target_request(self, flow: http.HTTPFlow) -> bool:
         """Check if this is a target API request."""
@@ -495,15 +553,22 @@ class AnthropicCaptureAddon:
         """Update or create a session."""
         session_id = parsed_request.session_id
         logger.info(f"[_update_session] session_id={session_id}, active_sessions={list(self.state.active_sessions.keys())}")
+        log_manager = get_log_manager()
+        if log_manager:
+            log_manager.log_debug(f"[_update_session] session_id={session_id}, active_sessions={list(self.state.active_sessions.keys())}")
 
         if session_id not in self.state.active_sessions:
             # Try to load existing session from database
             existing_session = self.db.get_session(session_id)
             logger.info(f"[_update_session] Loaded from DB: {existing_session is not None}")
+            if log_manager:
+                log_manager.log_debug(f"[_update_session] Loaded from DB: {existing_session is not None}")
             if existing_session:
                 # Restore session from database
                 self.state.active_sessions[session_id] = existing_session
                 logger.info(f"[_update_session] Restored session from DB: total_requests={existing_session.total_requests}")
+                if log_manager:
+                    log_manager.log_debug(f"[_update_session] Restored session from DB: total_requests={existing_session.total_requests}")
             else:
                 # Create new session
                 session = Session(
@@ -523,21 +588,43 @@ class AnthropicCaptureAddon:
             session.model = parsed_request.model
 
     def _store_interaction(self, interaction: APIInteraction, flow: http.HTTPFlow = None, parsed_response=None) -> None:
-        """Store an API interaction in the database."""
+        """Store an API interaction in the database and log request details."""
         if not self.db:
             logger.warning("Database not initialized")
             return
+
+        # Log request details to separate log file
+        log_manager = get_log_manager()
+        if log_manager:
+            url = f"https://api.anthropic.com{interaction.parsed_request.endpoint}"
+            extra_data = {
+                'request_id': interaction.request_id,
+                'model': interaction.parsed_request.model,
+                'input_tokens': interaction.input_tokens,
+                'output_tokens': interaction.output_tokens,
+                'cost': interaction.cost,
+                'response_time_ms': interaction.response_time_ms,
+            }
+            log_manager.log_request(
+                url=url,
+                request_body=interaction.request_body,
+                response_body=interaction.response_body.decode('utf-8', errors='replace') if interaction.response_body else '',
+                extra_data=extra_data
+            )
 
         # Filter out dirty data: Haiku model with zero tokens
         model = interaction.parsed_request.model or ""
         total_tokens = interaction.input_tokens + interaction.output_tokens
         if "haiku" in model.lower() and total_tokens == 0:
             logger.info(f"Skipping dirty data: {interaction.request_id} (Haiku with 0 tokens)")
+            log_manager.log_info(f"Skipping dirty data: {interaction.request_id} (Haiku with 0 tokens)")
             return
 
         # Update session
         session_id = interaction.parsed_request.session_id
         logger.info(f"[_store_interaction] session_id={session_id}, in_active={session_id in self.state.active_sessions}")
+        if log_manager:
+            log_manager.log_debug(f"[_store_interaction] session_id={session_id}, in_active={session_id in self.state.active_sessions}")
         if session_id in self.state.active_sessions:
             session = self.state.active_sessions[session_id]
             session.total_requests += 1
@@ -547,6 +634,8 @@ class AnthropicCaptureAddon:
             session.ended_at = datetime.now()
             self.db.upsert_session(session)
             logger.info(f"[_store_interaction] Updated session: total_requests={session.total_requests}")
+            if log_manager:
+                log_manager.log_debug(f"[_store_interaction] Updated session: total_requests={session.total_requests}")
 
         # Extract parsed response content
         response_text = ""
@@ -631,28 +720,35 @@ class AnthropicCaptureAddon:
 
     def done(self):
         """Called when the proxy is shutting down."""
-        logger.info("Shutting down AnthropicCaptureAddon...")
+        log_manager = get_log_manager()
+        if log_manager:
+            log_manager.log_info("Shutting down AnthropicCaptureAddon...")
 
         # Shutdown cleanup scheduler
         if self.cleanup_scheduler:
             try:
                 self.cleanup_scheduler.stop(timeout=5.0)
                 logger.info("Cleanup scheduler stopped")
+                log_manager.log_info("Cleanup scheduler stopped")
             except Exception as e:
                 logger.warning(f"Error stopping cleanup scheduler: {e}")
+                log_manager.log_warning(f"Error stopping cleanup scheduler: {e}")
 
         # Disconnect SocketIO client
         if self._socketio_client and self._socketio_client.connected:
             try:
                 self._socketio_client.disconnect()
                 logger.info("SocketIO client disconnected")
+                log_manager.log_info("SocketIO client disconnected")
             except Exception as e:
                 logger.warning(f"Error disconnecting SocketIO client: {e}")
+                log_manager.log_warning(f"Error disconnecting SocketIO client: {e}")
 
         # Shutdown write worker and flush pending items
         shutdown_worker(timeout=10.0)
 
-        logger.info("AnthropicCaptureAddon shutdown complete")
+        if log_manager:
+            log_manager.log_info("AnthropicCaptureAddon shutdown complete")
 
 
 # Export addon for mitmproxy

@@ -42,6 +42,11 @@ env/
 # Logs
 *.log
 
+# Mockups and design drafts
+*_mockup.html
+*_layout.html
+debug_*.png
+
 # OS
 .DS_Store
 Thumbs.db

@@ -596,7 +596,11 @@ class AnthropicCaptureAddon:
         # Log request details to separate log file
         log_manager = get_log_manager()
         if log_manager:
-            url = f"https://api.anthropic.com{interaction.parsed_request.endpoint}"
+            # Get URL from flow if available, otherwise use placeholder
+            if flow:
+                url = flow.request.url
+            else:
+                url = f"https://api.anthropic.com/v1/messages"
             extra_data = {
                 'request_id': interaction.request_id,
                 'model': interaction.parsed_request.model,
@@ -608,7 +612,7 @@ class AnthropicCaptureAddon:
             log_manager.log_request(
                 url=url,
                 request_body=interaction.request_body,
-                response_body=interaction.response_body.decode('utf-8', errors='replace') if interaction.response_body else '',
+                response_body=interaction.response_body or '',
                 extra_data=extra_data
             )
 

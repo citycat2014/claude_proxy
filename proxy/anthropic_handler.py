@@ -35,6 +35,7 @@ class ParsedRequest:
     # Extracted info
     user_agent: str = ""
     working_directory: str = ""
+    endpoint: str = ""
 
 
 @dataclass
@@ -172,6 +173,7 @@ class AnthropicHandler:
             raw_body=raw_body,
             user_agent=user_agent,
             working_directory=working_directory,
+            endpoint=endpoint,
         )
 
     def handle_response_start(

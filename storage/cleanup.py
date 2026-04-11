@@ -18,6 +18,7 @@ Usage:
 
 import os
 import sys
+import json
 import logging
 import threading
 import time
@@ -225,24 +226,26 @@ class DataCleanupManager:
 
         # Clean requests
         try:
-            req_count, req_space = self._cleanup_table(
+            req_count, req_space, req_recycle = self._cleanup_table(
                 Request, 'requests', 'timestamp', cutoff, cleanup_type
             )
             results['requests_cleaned'] = req_count
             results['space_reclaimed_bytes'] += req_space
-            logger.info(f"Cleaned {req_count} old requests")
+            results['recycle_bin_entries'] += req_recycle
+            logger.info(f"Cleaned {req_count} old requests, {req_recycle} moved to recycle bin")
         except Exception as e:
             logger.error(f"Failed to clean requests: {e}")
             results['errors'].append(f"requests: {str(e)}")
 
         # Clean tool calls
         try:
-            tool_count, tool_space = self._cleanup_table(
+            tool_count, tool_space, tool_recycle = self._cleanup_table(
                 ToolCall, 'tool_calls', 'timestamp', cutoff, cleanup_type
             )
             results['tool_calls_cleaned'] = tool_count
             results['space_reclaimed_bytes'] += tool_space
-            logger.info(f"Cleaned {tool_count} old tool calls")
+            results['recycle_bin_entries'] += tool_recycle
+            logger.info(f"Cleaned {tool_count} old tool calls, {tool_recycle} moved to recycle bin")
         except Exception as e:
             logger.error(f"Failed to clean tool calls: {e}")
             results['errors'].append(f"tool_calls: {str(e)}")
@@ -250,12 +253,13 @@ class DataCleanupManager:
         # Clean messages (if timestamp column exists)
         try:
             if hasattr(Message, 'timestamp'):
-                msg_count, msg_space = self._cleanup_table(
+                msg_count, msg_space, msg_recycle = self._cleanup_table(
                     Message, 'messages', 'timestamp', cutoff, cleanup_type
                 )
                 results['messages_cleaned'] = msg_count
                 results['space_reclaimed_bytes'] += msg_space
-                logger.info(f"Cleaned {msg_count} old messages")
+                results['recycle_bin_entries'] += msg_recycle
+                logger.info(f"Cleaned {msg_count} old messages, {msg_recycle} moved to recycle bin")
         except Exception as e:
             logger.warning(f"Failed to clean messages: {e}")
 
@@ -307,15 +311,16 @@ class DataCleanupManager:
             cleanup_type: 'auto' or 'manual'
 
         Returns:
-            Tuple of (number of records cleaned, space reclaimed in bytes)
+            Tuple of (number of records cleaned, space reclaimed in bytes, recycle bin entries)
         """
         fields_to_clean = self.FIELDS_TO_CLEAN.get(table_name, [])
         if not fields_to_clean:
             logger.warning(f"No fields configured for cleanup in {table_name}")
-            return 0, 0
+            return 0, 0, 0
 
         total_cleaned = 0
         total_space = 0
+        recycle_bin_count = 0
 
         with self.db.db_session() as session:
             # Get old record IDs in batches
@@ -325,13 +330,23 @@ class DataCleanupManager:
                     getattr(model_class, timestamp_col) < cutoff
                 )
 
-                # Check if any of the content fields still have data
+                # Check if ANY of the content fields still have data (use OR condition)
+                # Previously used AND which required all fields to have data - that was wrong
+                has_content_conditions = []
                 for field in fields_to_clean:
                     if hasattr(model_class, field):
-                        query = query.filter(
-                            getattr(model_class, field).isnot(None),
-                            getattr(model_class, field) != ''
+                        has_content_conditions.append(
+                            (getattr(model_class, field).isnot(None)) &
+                            (getattr(model_class, field) != '')
                         )
+
+                # Apply OR condition: select records where at least one field has content
+                if has_content_conditions:
+                    from sqlalchemy import or_
+                    query = query.filter(or_(*has_content_conditions))
+                else:
+                    # No fields to check, skip this batch
+                    break
 
                 records = query.limit(self.batch_size).all()
 
@@ -365,6 +380,7 @@ class DataCleanupManager:
                             metadata=metadata,
                             cleanup_type=cleanup_type
                         )
+                        recycle_bin_count += 1
 
                     # Clear content fields
                     for field in fields_to_clean:
@@ -377,7 +393,7 @@ class DataCleanupManager:
                 if len(records) < self.batch_size:
                     break
 
-        return total_cleaned, total_space
+        return total_cleaned, total_space, recycle_bin_count
 
     def vacuum_database(self) -> bool:
         """
@@ -607,7 +623,19 @@ def run_cleanup_now(db: Database = None, days: int = None, dry_run: bool = False
     if db is None:
         db = Database()
 
-    cleanup = DataCleanupManager(db, retention_days=days)
+    # 初始化日志管理器，确保清理操作被记录
+    log_manager = CleanupLogManager(db)
+
+    # 初始化回收站管理器，确保数据被移动到回收站
+    recycle_bin = RecycleBinManager(db)
+
+    cleanup = DataCleanupManager(
+        db,
+        retention_days=days,
+        log_manager=log_manager,
+        recycle_bin=recycle_bin,
+        use_recycle_bin=True
+    )
     return cleanup.cleanup_old_data(days=days, dry_run=dry_run)
 
 
